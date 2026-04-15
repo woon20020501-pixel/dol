@@ -1,0 +1,101 @@
+[
+  {
+    "name": "rt_model_a_phi_0.0004_0.0005_slip_0.0001_0.0001_br_0.0",
+    "input": {
+      "phi_t_p": 0.0004,
+      "phi_t_c": 0.0005,
+      "slip_p": 0.0001,
+      "slip_c": 0.0001,
+      "bridge_rt": 0.0
+    },
+    "expected": {
+      "result": 0.0022
+    },
+    "tolerance": 1e-12,
+    "notes": "Model A: both legs taker"
+  },
+  {
+    "name": "rt_model_a_phi_0.0004_0.0005_slip_0.0005_0.0005_br_0.001",
+    "input": {
+      "phi_t_p": 0.0004,
+      "phi_t_c": 0.0005,
+      "slip_p": 0.0005,
+      "slip_c": 0.0005,
+      "bridge_rt": 0.001
+    },
+    "expected": {
+      "result": 0.0048000000000000004
+    },
+    "tolerance": 1e-12,
+    "notes": "Model A: both legs taker"
+  },
+  {
+    "name": "rt_model_a_phi_0.001_0.001_slip_0.001_0.001_br_0.0015",
+    "input": {
+      "phi_t_p": 0.001,
+      "phi_t_c": 0.001,
+      "slip_p": 0.001,
+      "slip_c": 0.001,
+      "bridge_rt": 0.0015
+    },
+    "expected": {
+      "result": 0.0095
+    },
+    "tolerance": 1e-12,
+    "notes": "Model A: both legs taker"
+  },
+  {
+    "name": "rt_model_c_phi_m_0.00015_legw_0.5",
+    "input": {
+      "phi_m_p": 0.00015,
+      "phi_t_p": 0.0004,
+      "phi_t_c": 0.0005,
+      "slip_p": 0.0001,
+      "slip_c": 0.0001,
+      "bridge_rt": 0.0,
+      "legging_window_seconds": 0.5,
+      "sigma_price_per_sqrt_day": 0.05
+    },
+    "expected": {
+      "result": 0.0019459705970753711
+    },
+    "tolerance": 1e-12,
+    "notes": "Model C: maker + taker hybrid"
+  },
+  {
+    "name": "rt_model_c_phi_m_0.0001_legw_1.0",
+    "input": {
+      "phi_m_p": 0.0001,
+      "phi_t_p": 0.0004,
+      "phi_t_c": 0.0005,
+      "slip_p": 0.0005,
+      "slip_c": 0.0005,
+      "bridge_rt": 0.001,
+      "legging_window_seconds": 1.0,
+      "sigma_price_per_sqrt_day": 0.05
+    },
+    "expected": {
+      "result": 0.004135722919973033
+    },
+    "tolerance": 1e-12,
+    "notes": "Model C: maker + taker hybrid"
+  },
+  {
+    "name": "rt_model_c_phi_m_0.0_legw_0.5",
+    "input": {
+      "phi_m_p": 0.0,
+      "phi_t_p": 0.0004,
+      "phi_t_c": 0.0005,
+      "slip_p": 0.001,
+      "slip_c": 0.001,
+      "bridge_rt": 0.0015,
+      "legging_window_seconds": 0.5,
+      "sigma_price_per_sqrt_day": 0.1
+    },
+    "expected": {
+      "result": 0.006091941194150742
+    },
+    "tolerance": 1e-12,
+    "notes": "Model C: maker + taker hybrid"
+  }
+]

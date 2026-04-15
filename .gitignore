@@ -1,0 +1,68 @@
+# ── Secrets (never commit) ──────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+secrets*
+deployer_private_key*
+
+# ── Rust build artifacts ────────────────────────────────────────────
+target/
+**/target/
+Cargo.lock.bak
+*.rs.bk
+
+# ── Python build / cache ────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+pip-log.txt
+
+# ── Node / Next.js ──────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# ── Foundry / Solidity ──────────────────────────────────────────────
+contracts/packages/contracts/out/
+contracts/packages/contracts/cache/
+contracts/packages/contracts/broadcast/
+contracts/packages/contracts/lcov.info
+contracts/packages/contracts/slither-report.json
+contracts/packages/contracts/foundry.lock
+lib/forge-std/
+lib/openzeppelin-contracts/
+
+# ── Runtime outputs / logs ──────────────────────────────────────────
+logs/
+output/
+*.log
+*.jsonl
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# ── IDE / OS ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini

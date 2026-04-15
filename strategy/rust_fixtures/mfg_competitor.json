@@ -1,0 +1,86 @@
+[
+  {
+    "name": "mfg_zero_signal",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.001,
+      "theta_impact": 0.5,
+      "c_op_marginal": 50000.0
+    },
+    "expected": {
+      "result": 0.0
+    },
+    "tolerance": 1e-09,
+    "notes": "Weak signal → no competitors"
+  },
+  {
+    "name": "mfg_typical_mu_0.05",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.05,
+      "theta_impact": 0.5,
+      "c_op_marginal": 50000.0
+    },
+    "expected": {
+      "result": 2.1622776601683795
+    },
+    "tolerance": 1e-09,
+    "notes": "μ = 0.05"
+  },
+  {
+    "name": "mfg_typical_mu_0.1",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.1,
+      "theta_impact": 0.5,
+      "c_op_marginal": 50000.0
+    },
+    "expected": {
+      "result": 3.4721359549995796
+    },
+    "tolerance": 1e-09,
+    "notes": "μ = 0.1"
+  },
+  {
+    "name": "mfg_typical_mu_0.15",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.15,
+      "theta_impact": 0.5,
+      "c_op_marginal": 50000.0
+    },
+    "expected": {
+      "result": 4.477225575051661
+    },
+    "tolerance": 1e-09,
+    "notes": "μ = 0.15"
+  },
+  {
+    "name": "mfg_typical_mu_0.2",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.2,
+      "theta_impact": 0.5,
+      "c_op_marginal": 50000.0
+    },
+    "expected": {
+      "result": 5.324555320336759
+    },
+    "tolerance": 1e-09,
+    "notes": "μ = 0.2"
+  },
+  {
+    "name": "mfg_low_cop",
+    "input": {
+      "pi_pac": 5000000.0,
+      "d_eff": 0.1,
+      "theta_impact": 0.5,
+      "c_op_marginal": 10000.0
+    },
+    "expected": {
+      "result": 9.0
+    },
+    "tolerance": 1e-09,
+    "notes": "Cheap ops → crowded"
+  }
+]

@@ -1,0 +1,56 @@
+[
+  {
+    "name": "be_at_mean_typical",
+    "input": {
+      "mu": 0.1,
+      "c_round_trip": 0.002,
+      "rho_comp": 0.0
+    },
+    "expected": {
+      "result": 175.2
+    },
+    "tolerance": 1e-12,
+    "notes": "τ^BE = 8760·c/μ"
+  },
+  {
+    "name": "be_at_mean_with_competition",
+    "input": {
+      "mu": 0.1,
+      "c_round_trip": 0.002,
+      "rho_comp": 2.0
+    },
+    "expected": {
+      "result": 525.6
+    },
+    "tolerance": 1e-12,
+    "notes": "3× longer with 2 competitors"
+  },
+  {
+    "name": "be_low_mu",
+    "input": {
+      "mu": 0.01,
+      "c_round_trip": 0.002,
+      "rho_comp": 0.0
+    },
+    "expected": {
+      "result": 1752.0
+    },
+    "tolerance": 1e-12,
+    "notes": "Low spread → long τ^BE"
+  },
+  {
+    "name": "be_fixed_point_above_mean",
+    "input": {
+      "d0": 0.15,
+      "mu": 0.1,
+      "theta_ou": 0.01,
+      "c_round_trip": 0.002,
+      "rho_comp": 1.0
+    },
+    "expected": {
+      "result": 302.8201309821405
+    },
+    "tolerance": 0.0001,
+    "notes": "Fixed-point iteration, D₀ > μ"
+  }
+]

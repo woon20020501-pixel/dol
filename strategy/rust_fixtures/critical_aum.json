@@ -1,0 +1,50 @@
+[
+  {
+    "name": "crit_aum_typical_leverage_2",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 168.0,
+      "theta_impact": 0.5,
+      "leverage": 2,
+      "m_pos": 0.02
+    },
+    "expected": {
+      "result": 175595238.0952381
+    },
+    "tolerance": 1e-06,
+    "notes": "L=2 critical AUM"
+  },
+  {
+    "name": "crit_aum_higher_leverage",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 168.0,
+      "theta_impact": 0.5,
+      "leverage": 3,
+      "m_pos": 0.02
+    },
+    "expected": {
+      "result": 117063492.06349206
+    },
+    "tolerance": 1e-06,
+    "notes": "L=3 (smaller)"
+  },
+  {
+    "name": "crit_aum_at_breakeven_inf",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 168.0,
+      "tau_h": 168.0,
+      "theta_impact": 0.5,
+      "leverage": 2,
+      "m_pos": 0.02
+    },
+    "expected": {
+      "result": "inf"
+    },
+    "tolerance": 0.0,
+    "notes": "τ = τ^BE → critical AUM = ∞"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "dol_flow_positive_edge",
+    "input": {
+      "c_op_marginal": 50000.0,
+      "c_op_dol": 20000.0
+    },
+    "expected": {
+      "result": 30000.0
+    },
+    "tolerance": 1e-12,
+    "notes": "Dol has $30k/yr/pair edge"
+  },
+  {
+    "name": "dol_flow_no_edge",
+    "input": {
+      "c_op_marginal": 20000.0,
+      "c_op_dol": 20000.0
+    },
+    "expected": {
+      "result": null
+    },
+    "tolerance": 0.0,
+    "notes": "No edge → None (error)"
+  },
+  {
+    "name": "dol_flow_negative_edge",
+    "input": {
+      "c_op_marginal": 10000.0,
+      "c_op_dol": 20000.0
+    },
+    "expected": {
+      "result": null
+    },
+    "tolerance": 0.0,
+    "notes": "Dol more expensive → None"
+  }
+]

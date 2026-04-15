@@ -1,0 +1,22 @@
+[package]
+name = "bot-tests"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bot-types        = { path = "../bot-types" }
+bot-math         = { path = "../bot-math" }
+bot-strategy-v3  = { path = "../bot-strategy-v3" }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+
+[dev-dependencies]
+bot-types        = { path = "../bot-types" }
+bot-math         = { path = "../bot-math" }
+bot-strategy-v3  = { path = "../bot-strategy-v3" }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+hashbrown        = { workspace = true }

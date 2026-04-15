@@ -1,0 +1,25 @@
+[
+  {
+    "name": "dry_run_e2e_stub",
+    "input": {
+      "note": "Build LiveInputs from historical_cross_venue.sqlite + Mandate defaults",
+      "historical_db": "data/historical_cross_venue.sqlite",
+      "mandate": "default"
+    },
+    "expected": {
+      "note": "Run compute_rigorous_state and match all numeric fields to 6 decimal places.",
+      "fields_to_match": [
+        "n_universe_scanned",
+        "n_passing_filters",
+        "leverage",
+        "chance_constrained.feasible",
+        "chance_constrained.idle_alpha",
+        "chance_constrained.portfolio_mean_apy",
+        "chance_constrained.vault_5pct_apy",
+        "chance_constrained.vault_1pct_apy"
+      ]
+    },
+    "tolerance": 1e-06,
+    "notes": "Full E2E requires a separate generation script."
+  }
+]

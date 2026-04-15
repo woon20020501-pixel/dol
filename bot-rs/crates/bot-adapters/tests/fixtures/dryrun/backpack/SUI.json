@@ -1,0 +1,24 @@
+{
+  "venue": "Backpack",
+  "symbol": "SUI",
+  "ts_ms": 1776225863000,
+  "mid_price": 1.203,
+  "bid_price": 1.201,
+  "ask_price": 1.205,
+  "tick_size": 0.001,
+  "mark_bias_bps": 0.3,
+  "depth_top_usd": 7500.0,
+  "depth_curve": [
+    [1.0, 7500.0],
+    [2.0, 7500.0],
+    [5.0, 7500.0],
+    [10.0, 7500.0],
+    [20.0, 7500.0]
+  ],
+  "funding_rate_annual": 0.038,
+  "funding_rate_hourly": 0.00000434,
+  "funding_interval_seconds": 3600,
+  "next_funding_ts_ms": 1776229463000,
+  "volume_24h_usd": 300000000.0,
+  "open_interest_usd": 49000000.0
+}

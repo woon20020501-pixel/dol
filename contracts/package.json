@@ -1,0 +1,7 @@
+{
+  "name": "dol-pacifica-vault",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ]
+}

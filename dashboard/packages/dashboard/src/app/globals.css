@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Light theme (landing page default) */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+    --primary: 0 0% 12%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 0 0% 54%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 0 0% 12%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 82%;
+    --input: 0 0% 82%;
+    --ring: 0 0% 12%;
+    --radius: 0.5rem;
+  }
+
+  /* Dark theme (operator dashboard) — Apple Pro dark palette
+   * #0a0a0b bg, #141416 surface, #1c1c1f elevated, #2a2a2d border
+   * Inspired by Final Cut Pro / Logic Pro / Linear / Vercel */
+  .dark {
+    --background: 240 7% 4%;
+    --foreground: 240 5% 96%;
+    --card: 240 5% 8%;
+    --card-foreground: 240 5% 96%;
+    --popover: 240 5% 8%;
+    --popover-foreground: 240 5% 96%;
+    --primary: 168 76% 52%;
+    --primary-foreground: 240 7% 4%;
+    --secondary: 240 4% 12%;
+    --secondary-foreground: 240 3% 85%;
+    --muted: 240 4% 10%;
+    --muted-foreground: 240 3% 54%;
+    --accent: 168 76% 52%;
+    --accent-foreground: 240 7% 4%;
+    --destructive: 0 88% 61%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 17%;
+    --input: 240 4% 12%;
+    --ring: 168 76% 52%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Respect prefers-reduced-motion globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus visible ring utility for custom inputs */
+@layer components {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+}
+
+/* Global focus-visible ring — Apple-style thin white outline on every
+   interactive element. Keyboard users get clear affordances, mouse
+   users don't see anything (focus-visible only triggers on keyboard). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.7);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Round buttons and pills don't need a square outline — match their radius */
+  a.rounded-full:focus-visible,
+  button.rounded-full:focus-visible {
+    border-radius: 9999px;
+  }
+
+  /* sr-only — screen reader only (used on skip link) */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .focus\:not-sr-only:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+}
+
+/*
+ * Scroll-driven hero animation — CSS `animation-timeline: scroll()`.
+ *
+ * Chrome 115+ (and rolling out to other engines) exposes the Scroll-
+ * Driven Animations API as first-class CSS. Instead of a JS scroll
+ * listener + requestAnimationFrame to drive a transform, we declare
+ * the keyframes and attach them to a `view()` or `scroll()` timeline;
+ * the browser runs everything on the compositor with zero JS cost.
+ *
+ * Our effect: as `.dol-hero-scroll-anim` approaches the top of the
+ * viewport and begins to leave upward, the element gently rotates and
+ * scales down, giving the Hero's Dol pebble a subtle "settling into
+ * place" feel as the user scrolls past it. Modern browsers get the
+ * effect for free; older browsers simply see the rest state.
+ *
+ * Wrapped in `@supports` so we never apply anything when the API is
+ * absent — no broken state, no flash of wrong style.
+ */
+@supports (animation-timeline: view()) {
+  /*
+   * The hero is already fully visible on page load, so its "entry"
+   * phase never actually runs — we only need the animation during
+   * the exit phase as the element scrolls off the top of the
+   * viewport. `animation-range: exit 0% exit 100%` restricts
+   * progress to that window only, and the keyframes describe the
+   * complete exit trajectory from rest to shrunk+rotated.
+   */
+  @keyframes dolHeroScrollReveal {
+    from {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+    to {
+      transform: scale(0.82) rotate(4deg);
+      opacity: 0.45;
+    }
+  }
+  .dol-hero-scroll-anim {
+    animation: dolHeroScrollReveal linear both;
+    animation-timeline: view();
+    animation-range: exit 0% exit 100%;
+  }
+}
+
+/*
+ * Respect prefers-reduced-motion — the scroll-driven animation still
+ * counts as motion even though it's scroll-linked, so kill it for
+ * users who've opted out.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .dol-hero-scroll-anim {
+    animation: none !important;
+  }
+}

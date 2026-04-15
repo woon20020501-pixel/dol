@@ -1,0 +1,65 @@
+[
+  {
+    "name": "lifecycle_spread_0.1_hold_336.0_L_3",
+    "input": {
+      "per_pair_spread_apy": 0.1,
+      "commitment_hold_h": 336.0,
+      "c_round_trip": 0.002,
+      "leverage": 3,
+      "alpha": 0.5,
+      "r_idle": 0.044
+    },
+    "expected": {
+      "vault_gross": 0.05789285714285715,
+      "customer": 0.037630357142857146,
+      "buffer": 0.014473214285714287,
+      "reserve": 0.0057892857142857156,
+      "rotations_per_year": 26.071428571428573,
+      "net_on_margin": 0.0717857142857143
+    },
+    "tolerance": 1e-12,
+    "notes": "Python lifecycle reference"
+  },
+  {
+    "name": "lifecycle_spread_0.15_hold_168.0_L_2",
+    "input": {
+      "per_pair_spread_apy": 0.15,
+      "commitment_hold_h": 168.0,
+      "c_round_trip": 0.0015,
+      "leverage": 2,
+      "alpha": 0.5,
+      "r_idle": 0.044
+    },
+    "expected": {
+      "vault_gross": 0.057892857142857135,
+      "customer": 0.03763035714285714,
+      "buffer": 0.014473214285714284,
+      "reserve": 0.005789285714285714,
+      "rotations_per_year": 52.142857142857146,
+      "net_on_margin": 0.07178571428571427
+    },
+    "tolerance": 1e-12,
+    "notes": "Python lifecycle reference"
+  },
+  {
+    "name": "lifecycle_spread_0.08_hold_720.0_L_3",
+    "input": {
+      "per_pair_spread_apy": 0.08,
+      "commitment_hold_h": 720.0,
+      "c_round_trip": 0.002,
+      "leverage": 3,
+      "alpha": 0.5,
+      "r_idle": 0.05
+    },
+    "expected": {
+      "vault_gross": 0.06675,
+      "customer": 0.0433875,
+      "buffer": 0.0166875,
+      "reserve": 0.006675,
+      "rotations_per_year": 12.166666666666666,
+      "net_on_margin": 0.08349999999999999
+    },
+    "tolerance": 1e-12,
+    "notes": "Python lifecycle reference"
+  }
+]

@@ -1,0 +1,28 @@
+[package]
+name = "bot-runtime"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+bot-types        = { path = "../bot-types" }
+bot-math         = { path = "../bot-math" }
+bot-adapters     = { path = "../bot-adapters" }
+bot-strategy-v3  = { path = "../bot-strategy-v3" }
+
+tokio         = { workspace = true }
+async-trait   = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+thiserror     = { workspace = true }
+tracing       = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono        = { workspace = true }
+anyhow        = { workspace = true }
+futures-util  = { workspace = true }
+
+[dev-dependencies]
+tokio         = { workspace = true, features = ["full", "test-util"] }
+tempfile      = "3"

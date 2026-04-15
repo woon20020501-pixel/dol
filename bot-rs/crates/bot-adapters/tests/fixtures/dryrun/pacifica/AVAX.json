@@ -1,0 +1,24 @@
+{
+  "venue": "Pacifica",
+  "symbol": "AVAX",
+  "ts_ms": 1776225863000,
+  "mid_price": 30.00,
+  "bid_price": 29.95,
+  "ask_price": 30.05,
+  "tick_size": 0.01,
+  "mark_bias_bps": 0.0,
+  "depth_top_usd": 14000.0,
+  "depth_curve": [
+    [1.0, 14000.0],
+    [2.0, 14000.0],
+    [5.0, 14000.0],
+    [10.0, 14000.0],
+    [20.0, 14000.0]
+  ],
+  "funding_rate_annual": -0.080,
+  "funding_rate_hourly": -0.00000913,
+  "funding_interval_seconds": 28800,
+  "next_funding_ts_ms": 1776254663000,
+  "volume_24h_usd": 1100000000.0,
+  "open_interest_usd": 185000000.0
+}

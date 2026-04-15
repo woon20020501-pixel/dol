@@ -1,0 +1,167 @@
+[
+  {
+    "name": "bernstein_tau_zero",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 0.0,
+      "epsilon": 0.001
+    },
+    "expected": {
+      "result": 10
+    },
+    "tolerance": 0.0,
+    "notes": "τ=0 → L ≈ 1/MMR (integer floor)"
+  },
+  {
+    "name": "bernstein_tau_24.0_eps_0.01",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 24.0,
+      "epsilon": 0.01
+    },
+    "expected": {
+      "result": 7
+    },
+    "tolerance": 0.0,
+    "notes": "τ=24.0h, ε=0.01"
+  },
+  {
+    "name": "bernstein_tau_24.0_eps_0.001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 24.0,
+      "epsilon": 0.001
+    },
+    "expected": {
+      "result": 5
+    },
+    "tolerance": 0.0,
+    "notes": "τ=24.0h, ε=0.001"
+  },
+  {
+    "name": "bernstein_tau_24.0_eps_0.0001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 24.0,
+      "epsilon": 0.0001
+    },
+    "expected": {
+      "result": 5
+    },
+    "tolerance": 0.0,
+    "notes": "τ=24.0h, ε=0.0001"
+  },
+  {
+    "name": "bernstein_tau_168.0_eps_0.01",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 168.0,
+      "epsilon": 0.01
+    },
+    "expected": {
+      "result": 3
+    },
+    "tolerance": 0.0,
+    "notes": "τ=168.0h, ε=0.01"
+  },
+  {
+    "name": "bernstein_tau_168.0_eps_0.001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 168.0,
+      "epsilon": 0.001
+    },
+    "expected": {
+      "result": 3
+    },
+    "tolerance": 0.0,
+    "notes": "τ=168.0h, ε=0.001"
+  },
+  {
+    "name": "bernstein_tau_168.0_eps_0.0001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 168.0,
+      "epsilon": 0.0001
+    },
+    "expected": {
+      "result": 2
+    },
+    "tolerance": 0.0,
+    "notes": "τ=168.0h, ε=0.0001"
+  },
+  {
+    "name": "bernstein_tau_720.0_eps_0.01",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 720.0,
+      "epsilon": 0.01
+    },
+    "expected": {
+      "result": 2
+    },
+    "tolerance": 0.0,
+    "notes": "τ=720.0h, ε=0.01"
+  },
+  {
+    "name": "bernstein_tau_720.0_eps_0.001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 720.0,
+      "epsilon": 0.001
+    },
+    "expected": {
+      "result": 1
+    },
+    "tolerance": 0.0,
+    "notes": "τ=720.0h, ε=0.001"
+  },
+  {
+    "name": "bernstein_tau_720.0_eps_0.0001",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.01,
+      "sigma_per_h": 0.005,
+      "tau_h": 720.0,
+      "epsilon": 0.0001
+    },
+    "expected": {
+      "result": 1
+    },
+    "tolerance": 0.0,
+    "notes": "τ=720.0h, ε=0.0001"
+  },
+  {
+    "name": "bernstein_high_variance",
+    "input": {
+      "mmr": 0.05,
+      "delta_per_h": 0.05,
+      "sigma_per_h": 0.02,
+      "tau_h": 168.0,
+      "epsilon": 0.001
+    },
+    "expected": {
+      "result": 1
+    },
+    "tolerance": 0.0,
+    "notes": "High vol → tight L"
+  }
+]

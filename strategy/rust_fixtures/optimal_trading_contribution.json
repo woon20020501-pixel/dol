@@ -1,0 +1,87 @@
+[
+  {
+    "name": "T_star_at_breakeven_zero",
+    "input": {
+      "d_eff": 0.1,
+      "pi_pac": 5000000.0,
+      "rho_comp": 0.0,
+      "theta_impact": 0.5,
+      "aum": 1000000.0,
+      "tau_be_h": 168.0,
+      "tau_h": 168.0
+    },
+    "expected": {
+      "result": 0.0
+    },
+    "tolerance": 1e-12,
+    "notes": "τ = τ^BE → T* = 0"
+  },
+  {
+    "name": "T_star_d_0.1_a_1000000.0",
+    "input": {
+      "d_eff": 0.1,
+      "pi_pac": 5000000.0,
+      "rho_comp": 0.0,
+      "theta_impact": 0.5,
+      "aum": 1000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 168.0
+    },
+    "expected": {
+      "result": 0.1233347505668934
+    },
+    "tolerance": 1e-12,
+    "notes": "Typical trading contribution"
+  },
+  {
+    "name": "T_star_d_0.1_a_1000000.0",
+    "input": {
+      "d_eff": 0.1,
+      "pi_pac": 5000000.0,
+      "rho_comp": 1.0,
+      "theta_impact": 0.5,
+      "aum": 1000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 168.0
+    },
+    "expected": {
+      "result": 0.0616673752834467
+    },
+    "tolerance": 1e-12,
+    "notes": "Typical trading contribution"
+  },
+  {
+    "name": "T_star_d_0.15_a_10000000.0",
+    "input": {
+      "d_eff": 0.15,
+      "pi_pac": 5000000.0,
+      "rho_comp": 0.5,
+      "theta_impact": 0.5,
+      "aum": 10000000.0,
+      "tau_be_h": 70.0,
+      "tau_h": 336.0
+    },
+    "expected": {
+      "result": 0.015668402777777778
+    },
+    "tolerance": 1e-12,
+    "notes": "Typical trading contribution"
+  },
+  {
+    "name": "T_star_d_0.08_a_5000000.0",
+    "input": {
+      "d_eff": 0.08,
+      "pi_pac": 10000000.0,
+      "rho_comp": 2.0,
+      "theta_impact": 0.3,
+      "aum": 5000000.0,
+      "tau_be_h": 100.0,
+      "tau_h": 720.0
+    },
+    "expected": {
+      "result": 0.03295610425240055
+    },
+    "tolerance": 1e-12,
+    "notes": "Typical trading contribution"
+  }
+]

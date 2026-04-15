@@ -1,0 +1,24 @@
+{
+  "venue": "Hyperliquid",
+  "symbol": "BTC",
+  "ts_ms": 1776225863000,
+  "mid_price": 100012.5,
+  "bid_price": 100010.0,
+  "ask_price": 100015.0,
+  "tick_size": 0.1,
+  "mark_bias_bps": 0.3,
+  "depth_top_usd": 48200.0,
+  "depth_curve": [
+    [1.0, 48200.0],
+    [2.0, 48200.0],
+    [5.0, 48200.0],
+    [10.0, 48200.0],
+    [20.0, 48200.0]
+  ],
+  "funding_rate_annual": 0.0438,
+  "funding_rate_hourly": 0.000005,
+  "funding_interval_seconds": 28800,
+  "next_funding_ts_ms": 1776254663000,
+  "volume_24h_usd": 10250000000.0,
+  "open_interest_usd": 1850000000.0
+}

@@ -1,0 +1,63 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bot-types",
+    "crates/bot-math",
+    "crates/bot-strategy-v3",
+    "crates/bot-tests",
+    "crates/bot-venues",
+    "crates/bot-cli",
+    "crates/bot-adapters",
+    "crates/bot-runtime",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# WebSocket client for bot-venues
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+
+# HTTP client for bot-venues REST / bot-adapters
+reqwest = { version = "0.12", features = ["json", "native-tls"] }
+
+# Logging / tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Errors
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Config / env
+dotenvy = "0.15"
+
+# Serde
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Reconnect jitter in bot-venues
+rand = "0.8"
+
+# Pure-math collections
+hashbrown = { version = "0.14", features = ["serde"] }
+
+# Async trait
+async-trait = "0.1"
+
+# Property testing
+proptest = "1"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

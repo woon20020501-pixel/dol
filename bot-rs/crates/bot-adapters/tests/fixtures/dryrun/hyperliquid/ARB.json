@@ -1,0 +1,24 @@
+{
+  "venue": "Hyperliquid",
+  "symbol": "ARB",
+  "ts_ms": 1776225863000,
+  "mid_price": 0.802,
+  "bid_price": 0.800,
+  "ask_price": 0.804,
+  "tick_size": 0.001,
+  "mark_bias_bps": 0.1,
+  "depth_top_usd": 8500.0,
+  "depth_curve": [
+    [1.0, 8500.0],
+    [2.0, 8500.0],
+    [5.0, 8500.0],
+    [10.0, 8500.0],
+    [20.0, 8500.0]
+  ],
+  "funding_rate_annual": 0.012,
+  "funding_rate_hourly": 0.00000137,
+  "funding_interval_seconds": 28800,
+  "next_funding_ts_ms": 1776254663000,
+  "volume_24h_usd": 620000000.0,
+  "open_interest_usd": 95000000.0
+}

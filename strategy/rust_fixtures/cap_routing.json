@@ -1,0 +1,166 @@
+[
+  {
+    "name": "cap_routing_gross_0.0",
+    "input": {
+      "vault_gross": 0.0,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.0,
+      "buffer": 0.0,
+      "reserve": 0.0
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.0 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.04",
+    "input": {
+      "vault_gross": 0.04,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.026000000000000002,
+      "buffer": 0.01,
+      "reserve": 0.004
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.04 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.08",
+    "input": {
+      "vault_gross": 0.08,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.052000000000000005,
+      "buffer": 0.02,
+      "reserve": 0.008
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.08 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.12308",
+    "input": {
+      "vault_gross": 0.12308,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.030772,
+      "reserve": 0.012308
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.12308 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.2",
+    "input": {
+      "vault_gross": 0.2,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.05,
+      "reserve": 0.07
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.2 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.25",
+    "input": {
+      "vault_gross": 0.25,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.05,
+      "reserve": 0.12000000000000002
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.25 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.3",
+    "input": {
+      "vault_gross": 0.3,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.05,
+      "reserve": 0.17
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.3 routing"
+  },
+  {
+    "name": "cap_routing_gross_0.5",
+    "input": {
+      "vault_gross": 0.5,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.05,
+      "reserve": 0.37
+    },
+    "tolerance": 1e-12,
+    "notes": "Gross 0.5 routing"
+  },
+  {
+    "name": "cap_routing_conservation",
+    "input": {
+      "vault_gross": 0.2,
+      "cut_customer": 0.65,
+      "cut_buffer": 0.25,
+      "cut_reserve": 0.1,
+      "cust_max": 0.08,
+      "buf_max": 0.05
+    },
+    "expected": {
+      "customer": 0.08,
+      "buffer": 0.05,
+      "reserve": 0.07,
+      "sum": 0.2,
+      "sum_equals_gross": true
+    },
+    "tolerance": 1e-12,
+    "notes": "Sum = R invariant"
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "name": "n_star_at_breakeven",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 168.0,
+      "tau_h": 168.0,
+      "theta_impact": 0.5
+    },
+    "expected": {
+      "result": 0.0
+    },
+    "tolerance": 1e-12,
+    "notes": "τ = τ^BE → n_star = 0"
+  },
+  {
+    "name": "n_star_upper_bound",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 168.0,
+      "tau_h": 10000000000.0,
+      "theta_impact": 0.5
+    },
+    "expected": {
+      "result": 4999999.916
+    },
+    "tolerance": 0.001,
+    "notes": "τ → ∞, n_star → Π/(2θ)"
+  },
+  {
+    "name": "n_star_typical_tau_168.0",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 168.0,
+      "theta_impact": 0.5
+    },
+    "expected": {
+      "result": 3511904.7619047617
+    },
+    "tolerance": 1e-09,
+    "notes": "Typical τ = 168.0h"
+  },
+  {
+    "name": "n_star_typical_tau_336.0",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 336.0,
+      "theta_impact": 0.5
+    },
+    "expected": {
+      "result": 4255952.380952381
+    },
+    "tolerance": 1e-09,
+    "notes": "Typical τ = 336.0h"
+  },
+  {
+    "name": "n_star_typical_tau_720.0",
+    "input": {
+      "pi_pac": 5000000.0,
+      "tau_be_h": 50.0,
+      "tau_h": 720.0,
+      "theta_impact": 0.5
+    },
+    "expected": {
+      "result": 4652777.777777778
+    },
+    "tolerance": 1e-09,
+    "notes": "Typical τ = 720.0h"
+  }
+]

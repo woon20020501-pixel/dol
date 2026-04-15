@@ -1,0 +1,13 @@
+[package]
+name = "bot-strategy-v3"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bot-types = { path = "../bot-types" }
+bot-math   = { path = "../bot-math" }
+thiserror  = { workspace = true }
+serde      = { workspace = true }

@@ -1,0 +1,92 @@
+[
+  {
+    "name": "impact_n_zero",
+    "input": {
+      "d0": 0.15,
+      "mu": 0.1,
+      "theta_ou": 0.01,
+      "tau_h": 168.0,
+      "n_per_leg": 0.0,
+      "pi_pac": 5000000.0,
+      "theta_impact": 0.5,
+      "rho_comp": 0.0
+    },
+    "expected": {
+      "result": 0.12421506023692233
+    },
+    "tolerance": 1e-12,
+    "notes": "n=0 → no impact"
+  },
+  {
+    "name": "impact_rho_zero",
+    "input": {
+      "d0": 0.15,
+      "mu": 0.1,
+      "theta_ou": 0.01,
+      "tau_h": 168.0,
+      "n_per_leg": 50000.0,
+      "pi_pac": 5000000.0,
+      "theta_impact": 0.5,
+      "rho_comp": 0.0
+    },
+    "expected": {
+      "result": 0.12359398493573771
+    },
+    "tolerance": 1e-12,
+    "notes": "Solo trader"
+  },
+  {
+    "name": "impact_high_competition",
+    "input": {
+      "d0": 0.15,
+      "mu": 0.1,
+      "theta_ou": 0.01,
+      "tau_h": 168.0,
+      "n_per_leg": 50000.0,
+      "pi_pac": 5000000.0,
+      "theta_impact": 0.5,
+      "rho_comp": 10.0
+    },
+    "expected": {
+      "result": 0.011235816812339792
+    },
+    "tolerance": 1e-12,
+    "notes": "10 competitors → /11 discount"
+  },
+  {
+    "name": "impact_saturated_to_zero",
+    "input": {
+      "d0": 0.15,
+      "mu": 0.1,
+      "theta_ou": 0.01,
+      "tau_h": 168.0,
+      "n_per_leg": 20000000.0,
+      "pi_pac": 5000000.0,
+      "theta_impact": 0.5,
+      "rho_comp": 0.0
+    },
+    "expected": {
+      "result": 0.0
+    },
+    "tolerance": 1e-12,
+    "notes": "n·θ/Π > 1 → signal saturated, result = 0"
+  },
+  {
+    "name": "impact_typical",
+    "input": {
+      "d0": 0.12,
+      "mu": 0.08,
+      "theta_ou": 0.005,
+      "tau_h": 336.0,
+      "n_per_leg": 100000.0,
+      "pi_pac": 5000000.0,
+      "theta_impact": 0.5,
+      "rho_comp": 1.0
+    },
+    "expected": {
+      "result": 0.049189163853821244
+    },
+    "tolerance": 1e-12,
+    "notes": "Typical 2-week hold"
+  }
+]

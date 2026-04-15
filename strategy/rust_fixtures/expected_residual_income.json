@@ -1,0 +1,47 @@
+[
+  {
+    "name": "eri_drift_regime",
+    "input": {
+      "s_now": 0.001,
+      "mu": 0.0001,
+      "theta": 0.0,
+      "hold_h": 168.0,
+      "direction": 1
+    },
+    "expected": {
+      "result": 0.016800000000000002
+    },
+    "tolerance": 1e-12,
+    "notes": "θ=0 → μ·hold"
+  },
+  {
+    "name": "eri_ou_regime",
+    "input": {
+      "s_now": 0.0002,
+      "mu": 0.0001,
+      "theta": 0.1,
+      "hold_h": 20.0,
+      "direction": 1
+    },
+    "expected": {
+      "result": 0.002864664716763387
+    },
+    "tolerance": 1e-12,
+    "notes": "OU integral with decay"
+  },
+  {
+    "name": "eri_negative_direction",
+    "input": {
+      "s_now": -0.001,
+      "mu": -0.0005,
+      "theta": 0.05,
+      "hold_h": 100.0,
+      "direction": -1
+    },
+    "expected": {
+      "result": 0.05993262053000915
+    },
+    "tolerance": 1e-12,
+    "notes": "Negative direction (short signal)"
+  }
+]
