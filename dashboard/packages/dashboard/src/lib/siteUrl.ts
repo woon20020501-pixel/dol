@@ -18,4 +18,4 @@ export const SITE_URL: string =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : "https://dol.app");
+      : "https://dol-finance.vercel.app");

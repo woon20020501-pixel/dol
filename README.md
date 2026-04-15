@@ -165,7 +165,7 @@ Dol grows in lockstep with [Pacifica's long-term vision](https://docs.pacifica.f
 **Contracts (Base Sepolia)**
 - `Dol.sol`: [`0x9E6Cc40CC68Ef1bf46Fcab5574E10771B7566Db4`](https://sepolia.basescan.org/address/0x9E6Cc40CC68Ef1bf46Fcab5574E10771B7566Db4)
 
-**Live dashboard**: https://dol-dashboard.vercel.app *(update with actual URL)*
+**Live dashboard**: https://dol-finance.vercel.app
 
 **Pacifica builder code**: registered *(update with actual code)*
 
