@@ -1,8 +1,8 @@
 # Dol
 
-**The easiest way to earn stable yield on your USDC.**
+A consumer-first DeFi product that turns Pacifica's perp infrastructure into a simple, 3-tap yield experience.
 
-Dol is a delta-neutral cross-venue funding-rate harvester on [Pacifica](https://app.pacifica.fi). Regular crypto holders deposit USDC, receive DOL tokens as a one-to-one receipt, and can burn them for instant USDC back at any time — no lock-ups, no cooldowns, no dashboards to watch. Under the hood a Rust decision engine runs the Aurora-Ω math framework to capture funding-rate spreads across DEX venues while remaining strictly β = 1.0 to the underlying asset.
+Dol is a market-neutral yield product for everyday crypto users. Deposit USDC, receive DOL 1:1, and redeem through a fast retail-style flow — without needing to understand funding, hedging, or cross-venue execution. Under the hood, Dol uses a Rust decision engine and Pacifica-native infrastructure to capture funding-rate differentials while minimizing directional exposure through matched same-asset hedges.
 
 ```
                        Simple UI
@@ -21,6 +21,46 @@ Dol is a delta-neutral cross-venue funding-rate harvester on [Pacifica](https://
 
 ---
 
+## Why users adopt Dol
+
+- No need to understand funding markets, hedge routing, or execution logic
+- Retail-first UX inspired by the simplicity of products like Robinhood and Toss
+- Clean deposit and redeem flow instead of fragmented DeFi workflows
+- Built on Pacifica's performance, APIs, and builder infrastructure
+
+---
+
+## Why Dol matters for Pacifica
+
+Dol shows how Pacifica can power not only trading interfaces, but real consumer financial products. It converts Pacifica's perp infrastructure into a retail-facing application that expands ecosystem utility, showcases builder leverage, and makes sophisticated strategies accessible to a broader class of users.
+
+---
+
+## Simple by design
+
+Traditional DeFi yield products ask users to understand venues, funding, leverage, collateral, and risk mechanics before they can do anything useful. Dol removes that complexity.
+
+With Dol, the user experience is simple:
+
+- Deposit USDC
+- Receive DOL 1:1 as a receipt token
+- Track value through a clean dashboard
+- Redeem through a fast, intuitive flow
+
+The complexity stays in the system, not on the user.
+
+---
+
+## Fast redemption, with guardrails
+
+Dol is built to feel instant for normal user flows.
+
+Under normal conditions, users can move through a fast redemption path designed for a smooth retail experience. Under stressed conditions, the system is protected by buffer rules, guardian controls, and fallback redemption logic designed to preserve system integrity and user safety.
+
+We optimize for simplicity at the surface and discipline underneath.
+
+---
+
 ## One product, four layers
 
 | Layer | What | Where |
@@ -32,9 +72,20 @@ Dol is a delta-neutral cross-venue funding-rate harvester on [Pacifica](https://
 
 ---
 
-## Test coverage: **442 passing, 0 failing** across the full stack
+## Proof of execution
 
-We don't hand-wave the risk model. Every mathematical claim has a unit test behind it.
+Dol is not a concept deck. It is a working full-stack product.
+
+- Live deposit and redeem flow demonstrated successfully
+- Smart contracts for receipt-token and redemption mechanics
+- Rust runtime for routing, risk enforcement, and NAV logic
+- Math framework for forecasting, bounds, portfolio constraints, and cycle discipline
+- Full-stack validation with extensive automated tests
+- Rust ↔ Python parity checks for core strategy logic
+
+We focused on building a product that works end-to-end, not just presenting an idea.
+
+### Test coverage: **442 passing, 0 failing** across the full stack
 
 ```bash
 # Rust runtime tests                (202 passing, 17 live-gated)
@@ -58,14 +109,13 @@ Plus 17 additional Rust live-credential integration tests (gated on `PACIFICA_AP
 
 ---
 
-## The iron law: β = 1.0 by construction
+## Risk model and execution discipline
 
-Dol holds the **same perpetual contract on two different DEX venues** — long on one, short on the other — and captures only the funding-rate spread between them. Because both legs reference the same underlying asset, price exposure cancels **mechanically**, not statistically. We enforce this in four "iron-law walls" inside the Rust runtime:
+Dol is designed to make a complex strategy feel simple to the user, without hand-waving the underlying risk model.
 
-1. **I-LOCK** — `funding_cycle_lock`: once a direction is committed on a pair, no mid-cycle flipping.
-2. **I-VENUE** — venue whitelist enforced at the Rust type level (closed enum). Adding a CEX requires editing a type signature, which trips code review.
-3. **I-SAME** — symbol-equality check: long-leg and short-leg symbols must match on-chain identifiers.
-4. **I-KILL** — FSM emergency flatten on adapter health, authorization failure, or oracle divergence.
+The system targets funding-rate differentials as the primary return driver while minimizing directional exposure through matched same-asset cross-venue hedges. Execution is constrained by explicit guardrails in the runtime, including venue restrictions, symbol matching, cycle discipline, and emergency flattening logic.
+
+Our goal is not to promise "risk-free yield," but to combine transparent system design, disciplined execution, and retail-grade usability.
 
 The framework is specified across [`strategy/docs/math-aurora-omega-appendix.md`](./strategy/docs/math-aurora-omega-appendix.md) (strict-propriety proof, concentration bounds, CVaR derivation), [`strategy/docs/math-frontier.md`](./strategy/docs/math-frontier.md) (conformal prediction, DRO, Hurst DFA), and [`strategy/docs/math-rigorous.md`](./strategy/docs/math-rigorous.md) (regime routing, chance-constrained portfolio).
 
@@ -140,23 +190,25 @@ Ten independent hedge pairs trading simultaneously. Each pair is long-on-one-ven
 
 ---
 
-## Why Dol, not another perp vault
+## Why Dol
 
-- **Retail-first, not operator-first.** Three taps to deposit. Instant burn for withdraw. No funding cycles to understand, no venues to pick, no rebalances to do.
-- **Delta-neutral by construction, not by vibes.** Same-asset two-venue hedge. β = 1.0 before any trade fires. Iron-law walls enforced in Rust types.
-- **Proof, not demos.** 442 passing tests, formal math spec in the repo, byte-level parity harness between the Rust runtime and the Python reference framework, every invariant tested.
-- **DEX-only, non-custodial.** No CEX dependency. No KYC. Users hold their keys at all times.
-- **Honest disclosure.** The RWA pairs carry an oracle-divergence warning; the demo mode is labelled; the Base Sepolia deployment is a testnet; the test-count claim in the demo video is verifiable with one command.
+Most DeFi products are built for users who already understand crypto market structure.
+
+Dol is built for everyone else.
+
+Instead of asking users to navigate funding markets, cross-venue hedges, and perp mechanics directly, Dol abstracts that complexity into a clean product experience. The result is a Pacifica-native yield product that feels simple on the surface while remaining deeply engineered underneath.
 
 ---
 
-## Roadmap
+## What's next
 
 Dol grows in lockstep with [Pacifica's long-term vision](https://docs.pacifica.fi).
 
-- **Week 2 — Validation.** Rust ↔ Python parity harness; staircase live rollout on Pacifica ($100 → $1,000 → $10,000); authenticated adapter + builder-code revenue share live.
-- **Month 1 — Retail-ready.** Mobile-first deposit flow alongside Pacifica iOS/Android launch; multi-collateral deposits via Pacifica Unified Trading Accounts (USDC, BTC, ETH, SOL); full 4-layer risk stack live on mainnet.
-- **Month 3 — Phase 3 ready.** 46-pair universe including Pacifica spot + RWA + exotic derivatives; Pacifica Options tail-risk overlays (covered calls, touch structures); native yield via Pacifica Lending; any deposit size from $10 to $10,000+; decision kernel portable to Pacifica L1 WASM runtime.
+- **Staircase live rollout.** Rust ↔ Python parity harness; staircase deployment on Pacifica ($100 → $1,000 → $10,000); authenticated adapter + builder-code revenue share live.
+- **Retail-ready.** Mobile-first deposit flow alongside Pacifica iOS/Android launch; multi-collateral deposits via Pacifica Unified Trading Accounts (USDC, BTC, ETH, SOL); full 4-layer risk stack live on mainnet.
+- **Pacifica Phase 3 ready.** 46-pair universe including Pacifica spot + RWA + exotic derivatives; Pacifica Options tail-risk overlays; native yield via Pacifica Lending; decision kernel portable to Pacifica L1 WASM runtime.
+- **ERC-4626 compatibility** for standardized vault integrations and clearer share-based accounting.
+- **Async redemption architecture** for stressed conditions, with ERC-7540-style request flows under evaluation.
 
 ---
 
