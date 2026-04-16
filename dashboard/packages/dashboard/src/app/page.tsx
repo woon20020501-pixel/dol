@@ -6,6 +6,7 @@ import { motion, animate, type Transition } from "framer-motion";
 import { useReadContract } from "wagmi";
 import { baseSepolia } from "wagmi/chains";
 import { type Abi } from "viem";
+import { Search } from "lucide-react";
 import DolHeroImage from "@/components/DolHeroImage";
 import WalletChip from "@/components/WalletChip";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -15,8 +16,10 @@ import { LiveVaultTicker } from "@/components/LiveVaultTicker";
 import { SectionNav } from "@/components/SectionNav";
 import { Glossary } from "@/components/Glossary";
 import { MobileMenu } from "@/components/MobileMenu";
+import { openCommandPalette } from "@/components/CommandPalette";
 import { getPBondConfig } from "@/lib/pbond";
 import { onDolStateShouldRefresh } from "@/lib/txEvents";
+import { DOL_APY } from "@/lib/constants";
 import { usePrivy } from "@privy-io/react-auth";
 import { useDolBalance } from "@/hooks/useDolBalance";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -27,7 +30,7 @@ const APPLE_EASE = [0.05, 0.7, 0.1, 1.0] as const;
    via discrete daily compounding. Recalculated on page load, stays static
    once the mount count-up completes. Matches how a bank posts daily interest. */
 const PRINCIPAL = 100;
-const APY = 0.075;
+const APY = DOL_APY;
 const APPLE_SPRING: Transition = {
   type: "spring",
   stiffness: 400,
@@ -81,6 +84,15 @@ export default function HomePage() {
             >
               FAQ
             </Link>
+            <button
+              type="button"
+              onClick={openCommandPalette}
+              className="hidden items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[12px] text-white/50 transition-colors hover:border-white/25 hover:text-white/80 sm:inline-flex"
+              aria-label="Search (Cmd+K)"
+            >
+              <Search className="h-3 w-3" />
+              <kbd className="font-mono text-[10px]">⌘K</kbd>
+            </button>
             {ready && !authenticated && (
               <button
                 onClick={login}

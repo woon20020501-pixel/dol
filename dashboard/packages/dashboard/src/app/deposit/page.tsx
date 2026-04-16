@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -38,10 +38,14 @@ import { Glossary } from "@/components/Glossary";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useTxHistory } from "@/hooks/useTxHistory";
 
+import {
+  DOL_APY,
+  USDC_DECIMALS,
+  PHASE_1_TVL_CAP_USDC,
+} from "@/lib/constants";
+
 const BASESCAN = "https://sepolia.basescan.org";
-const USDC_DECIMALS = 6;
 const TARGET_CHAIN_ID = baseSepolia.id;
-const DOL_APY = 0.075;
 
 function DepositPageInner() {
   useKeyboardShortcuts();
@@ -51,6 +55,22 @@ function DepositPageInner() {
   const { wallets } = useWallets();
   const [walletChainId, setWalletChainId] = useState<number | null>(null);
   const [amount, setAmount] = useState("");
+
+  // Graceful degradation on wallet disconnect mid-session. If the
+  // user fills in an amount, starts the approve flow, then their
+  // wallet disconnects (network drop, manual disconnect, extension
+  // crash), the form resets and a clear toast appears instead of
+  // silently entering an unrecoverable state.
+  const prevAddress = useRef<string | undefined>(userAddress);
+  useEffect(() => {
+    if (prevAddress.current && !userAddress) {
+      setAmount("");
+      toast("Wallet disconnected", {
+        description: "Reconnect your wallet to continue.",
+      });
+    }
+    prevAddress.current = userAddress;
+  }, [userAddress]);
   const txHistory = useTxHistory();
   // Layer B clickwrap — gates the first deposit per wallet on
   // TOS/Privacy/Risk acceptance. Modal is rendered further down.
@@ -143,8 +163,8 @@ function DepositPageInner() {
   // ceiling for Phase 1, derived from Pacifica's Closed Beta
   // per-account equity cap. The doc promised "deposits will be
   // limited and the frontend will surface a clear capacity-reached
-  // state instead of silently accepting money." Until the contracts
-  // layer adds a contract-level maxTotalAssets, this is that enforcement at
+  // state instead of silently accepting money." Until the contracts add
+  // a contract-level maxTotalAssets, this is that enforcement at
   // the frontend layer: we read the Dol contract's current totalSupply
   // (which tracks USDC value at near-1:1 during Phase 1), compute
   // how much headroom is left under the cap, and gate the approve
@@ -156,7 +176,8 @@ function DepositPageInner() {
   // real cap is Pacifica's own per-account limit on the operator
   // side. When mainnet lands, the cap should move into the contract.
   //
-  const PHASE_1_TVL_CAP_USDC = 100_000;
+  // Phase 1 TVL cap sourced from the central constants module — change
+  // once if the cap lifts, grep-and-pray is gone.
   const { data: totalSupplyRaw } = useReadContract({
     address: target.address,
     abi: target.abi,
@@ -491,6 +512,26 @@ function DepositPageInner() {
                 >
                   Switch network
                 </button>
+              </div>
+            )}
+
+            {/* Zero USDC faucet guide — first-time testnet users see
+                disabled chips and a "Balance: 0.00" with no next step.
+                This banner gives them a direct faucet link so they don't
+                bounce thinking Dol is broken. */}
+            {authenticated && usdcBalance !== null && usdcBalance === 0 && (
+              <div className="mt-8 rounded-2xl border border-senior/20 bg-senior/5 px-5 py-4 text-center">
+                <p className="text-sm text-white/80">
+                  New here? You need test USDC to try Dol.
+                </p>
+                <a
+                  href={BASE_SEPOLIA_USDC_FAUCET}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block rounded-full bg-senior px-6 py-2 text-sm font-medium text-black transition-colors hover:bg-senior-dark"
+                >
+                  Get test USDC &rarr;
+                </a>
               </div>
             )}
 

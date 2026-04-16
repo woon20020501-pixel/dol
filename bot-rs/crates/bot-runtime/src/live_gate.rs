@@ -10,13 +10,15 @@
 //!
 //! The wiring check is defense-in-depth: even if the operator sets the
 //! env var, the bot refuses to start in live mode until the v0 subset
-//! from `strategy/docs/integration-spec.md §3.5` is actually implemented.
+//! from `integration-spec.md` §3.5 is actually implemented. See
+//! `docs/v0-punchlist.md` for the current status.
 //!
-//! The env-gated-at-startup + component-checklist shape is the
-//! authoritative spec. An earlier library function `assert_live_allowed()`
-//! is preserved below as a lower-level helper for any call site that wants
-//! to re-verify the env var at a submission boundary in v1+; the
-//! authoritative entry is [`preflight_live_gate`].
+//! This shape (env-gated at startup + component
+//! checklist) is the authoritative spec. An earlier library function
+//! `assert_live_allowed()` is preserved below as a lower-level helper
+//! for any call site that wants to re-verify the env var at a submission
+//! boundary in Week 2+; but the authoritative entry is
+//! [`preflight_live_gate`].
 
 use std::env;
 
@@ -66,7 +68,8 @@ pub fn preflight_live_gate() -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "{}=1 requested but the following v0 components are not wired: {}.",
+            "{}=1 requested but the following v0 components are not wired: {}. \
+             See docs/v0-punchlist.md for the full live-promotion checklist.",
             RUNNER_ALLOW_LIVE_ENV,
             missing.join(", ")
         ))
@@ -87,15 +90,16 @@ pub fn preflight_live_gate() -> Result<(), String> {
 
 /// I-LOCK: `funding_cycle_lock.enforce()` wired into the decision path.
 ///
-/// Status: **true** — ported and threaded through `TickEngine::run_one_tick`
-/// via `cycle_lock::CycleLockRegistry`. Live tick proven against Pacifica API.
+/// Status: **true** — ported in Week 1 Step B
+/// and threaded through `TickEngine::run_one_tick` via
+/// `cycle_lock::CycleLockRegistry`. Live tick proven against Pacifica API.
 pub const fn has_funding_cycle_lock() -> bool {
     true
 }
 
 /// I-KILL: `fsm_controller` emergency-flatten wired.
 ///
-/// Status: **false** — Rust port deferred to v1+.
+/// Status: **false** — Rust port deferred to Week 2+. v0-punchlist §1 I-KILL.
 pub const fn has_fsm_emergency_flatten() -> bool {
     false
 }
@@ -104,28 +108,28 @@ pub const fn has_fsm_emergency_flatten() -> bool {
 /// evaluated every tick.
 ///
 /// Status: **false** — signal JSON currently emits stub `risk_stack`.
-/// Critical second line of defense; required before any live submission.
+/// v0-punchlist §1 I-BUDGET (critical, second line of defense).
 pub const fn has_cvar_guard_nonstub() -> bool {
     false
 }
 
 /// Bot-owned kill_switch (SIGTERM trap OR file-flag → 1s flatten).
 ///
-/// Status: **false** — v1+.
+/// Status: **false** — v0-punchlist §3 row 1.
 pub const fn has_kill_switch() -> bool {
     false
 }
 
 /// Bot-owned heartbeat (5s watchdog on hedge-fill subsystem).
 ///
-/// Status: **false** — v1+.
+/// Status: **false** — v0-punchlist §3 row 2.
 pub const fn has_heartbeat() -> bool {
     false
 }
 
 /// Bot-owned Pacifica API watchdog (3s latency → emergency flatten).
 ///
-/// Status: **false** — v1+.
+/// Status: **false** — v0-punchlist §3 row 3.
 pub const fn has_pacifica_watchdog() -> bool {
     false
 }
@@ -158,7 +162,8 @@ pub fn assert_live_allowed() -> anyhow::Result<()> {
             v
         )),
         Err(_) => Err(anyhow::anyhow!(
-            "{} env var not set — live submission blocked.",
+            "{} env var not set — live submission blocked. \
+             See docs/v0-punchlist.md.",
             RUNNER_ALLOW_LIVE_ENV
         )),
     }
@@ -207,7 +212,7 @@ mod tests {
     #[test]
     fn preflight_demo_mode_passes_when_true_string() {
         with_env(RUNNER_ALLOW_LIVE_ENV, Some("true"), || {
-            // Not "1" → treated as demo mode (silent pass) per spec.
+            // Not "1" -> treated as demo mode (silent pass). Matches the spec.
             assert!(preflight_live_gate().is_ok());
         });
     }

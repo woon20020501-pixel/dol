@@ -31,8 +31,8 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
  *   - Decision log ticker (scrolling JARVIS-style)
  *   - v0 mode badge (which framework layers are intentionally stubbed)
  *
- * Data source: client-side deterministic simulator seeded from the
- * authoritative runtime numbers. When the Rust bot's `output/nav.jsonl`
+ * Data source: client-side deterministic simulator seeded from the bot's
+ * authoritative numbers. When the Rust bot's `output/nav.jsonl`
  * stream is live, swap the hook's inner source — UI stays the same.
  */
 export function AuroraConsole() {

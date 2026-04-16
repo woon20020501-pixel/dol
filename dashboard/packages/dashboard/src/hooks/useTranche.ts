@@ -1,8 +1,9 @@
 "use client";
 
 import { useBotStatus } from "./useBotStatus";
+import { DOL_APY } from "@/lib/constants";
 
-const SENIOR_TARGET_APY = 0.075; // 7.5%
+const SENIOR_TARGET_APY = DOL_APY;
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
 // 30-day average carry score from Excel evidence

@@ -21,8 +21,8 @@ import { Search } from "lucide-react";
  * The filter is a straightforward substring search across command
  * labels; rank ties are broken by insertion order.
  *
- * This is the optional tier from Phase 2.5, shipped as part of the
- * consolidated trim commit.
+ * This is the "optional tier" from Phase 2.5, shipped as part
+ * of the consolidated trim commit.
  */
 
 type Command = {
@@ -32,6 +32,17 @@ type Command = {
   group: string;
   action: () => void;
 };
+
+/**
+ * Open the command palette from anywhere (e.g., a header ⌘K button).
+ * Dispatches a custom event that the palette listens for, so no React
+ * state sharing or context is needed.
+ */
+export function openCommandPalette(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("dol:open-palette"));
+  }
+}
 
 export function CommandPalette() {
   const router = useRouter();
@@ -138,6 +149,14 @@ export function CommandPalette() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Custom event trigger so external buttons can open the palette
+  // without needing React state sharing.
+  useEffect(() => {
+    const onCustom = () => setOpen(true);
+    window.addEventListener("dol:open-palette", onCustom);
+    return () => window.removeEventListener("dol:open-palette", onCustom);
   }, []);
 
   // Focus input when opened; reset on close

@@ -33,7 +33,9 @@ import { Glossary } from "./Glossary";
  * idea), but don't seed LiveCounter until a real value lands.
  */
 
-const APY = 0.075;
+import { DOL_APY } from "@/lib/constants";
+
+const APY = DOL_APY;
 const POLL_MS = 10_000;
 const SHARE_DECIMALS = 6;
 const TARGET_CHAIN_ID = baseSepolia.id;

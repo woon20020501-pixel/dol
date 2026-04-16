@@ -87,7 +87,7 @@ impl Venue {
     /// cost model. They are intentionally higher than the real current
     /// schedules to keep the `income > cost` check conservative — a real
     /// production build would replace them with live-calibrated values
-    /// via `slippage_calibration` (v1+ component).
+    /// via `slippage_calibration` (see `docs/v0-punchlist.md` §5).
     #[inline]
     pub const fn taker_fee_bps(&self) -> f64 {
         match self {
@@ -197,7 +197,7 @@ pub struct LiveInputs {
 /// Corresponds to Python `cost_model.Mandate`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Mandate {
-    // mandate targets
+    // Policy mandate targets
     pub customer_apy_min: AnnualizedRate, // 0.05
     pub customer_apy_max: AnnualizedRate, // 0.08
     pub buffer_apy_min: AnnualizedRate,   // 0.02
@@ -288,7 +288,7 @@ pub struct OuParams {
     /// `theta_ou`. This is the Python `fit_ou.sigma` scaled by 8760. With
     /// this convention, `σ / √(2θ)` naturally produces `AnnualizedRate`
     /// because the `√hour` factors cancel between `σ_ou` and `√(θ_ou)`.
-    /// (unit convention documented in the Python reference `stochastic.py`.)
+    /// (spec Part C.3, updated per review.)
     pub sigma_ou: Dimensionless,
 }
 

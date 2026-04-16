@@ -68,6 +68,8 @@ pub fn bernstein_leverage_bound(
 
     if l_cont < 1.0 {
         Ok(1)
+    } else if l_cont > u32::MAX as f64 {
+        Ok(u32::MAX)
     } else {
         Ok(l_cont.floor() as u32)
     }

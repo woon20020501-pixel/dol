@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
-// Authoritative numbers from the Week-1 runtime fixture (2026-04-15).
-// Per-tick NAV should come from nav.jsonl once the runtime is wired;
+// Authoritative numbers from the bot runtime (2026-04-15).
+// Per-tick NAV should come from nav.jsonl once the bot runtime is wired;
 // for now we drive a deterministic accel-factor simulator client-side so the
 // dashboard can present the Week-1 story even without the Rust bot running.
 
@@ -33,7 +33,7 @@ export const AURORA_CONSTANTS = {
   longVenue: "Pacifica",
   shortVenue: "Backpack",
   symbol: "BTC",
-  // multi-symbol universe
+  // Multi-symbol universe
   universeSizeDemo: 10,
   universeSizeProd: 46,
   deployedUsdDemo: 1_000,       // 10 × $100
@@ -60,7 +60,7 @@ export type SymbolSpec = {
   // Static baseline for diagnostics.book_parse_failures.
   // RWA symbols (XAU/XAG/PAXG) are degraded-by-construction because
   // Lighter and Backpack don't list gold/silver commodities; the bot
-  // routes them through Pacifica ↔ Hyperliquid (xyz:GOLD/SILVER).
+  // routes them through Pacifica <-> Hyperliquid (xyz:GOLD/SILVER).
   // This is expected operational state, NOT a fault, and must render
   // as a gray "reduced coverage" badge (never red alarm).
   bookParseDegraded: boolean;
@@ -69,7 +69,7 @@ export type SymbolSpec = {
 // Canonical 10-symbol universe: 7 crypto + 3 RWA.
 // Spreads are median values from week1_hist_spreads.json. BTC is
 // overridden to the Week-1 Pacifica live anomaly (18.92%); the
-// historical median is 0.39% — BTC is the "live outlier" demo case.
+// historical median is 0.39% -- BTC is the "live outlier" demo case.
 // XAU/XAG/PAXG carry oracle_divergence_risk = "structural".
 export const SYMBOL_UNIVERSE: SymbolSpec[] = [
   { symbol: "BTC",  spreadPct: 18.92, color: "#f7931a", tier: "anomaly", kind: "crypto", counterVenue: "Hyperliquid",      oracleDivergenceRisk: "minimal",    bookParseDegraded: false },
@@ -108,8 +108,8 @@ export type VenueHealth = {
   label: string;
   fundingApyPct: number | null;
   ageSec: number;
-  // In LIVE mode we count how many of the 10 signal JSONs include this
-  // venue under fair_value.contributing_venues.
+  // In LIVE mode we count how many of the 10 signal JSONs
+  // include this venue under fair_value.contributing_venues.
   // null in SIM mode (signal data unavailable).
   symbolCoverage: { covered: number; total: number } | null;
 };
@@ -231,7 +231,7 @@ function computeNavAtSimHour(simHours: number): {
 }
 
 function buildVenues(simHours: number): VenueHealth[] {
-  // SIM mode fixture values from the demo day snapshot. In LIVE mode the
+  // SIM mode placeholder values from demo day. In LIVE mode the
   // per-venue rows below get rebuilt from /api/signal data, with symbol
   // coverage counts replacing the funding APY estimates.
   return [

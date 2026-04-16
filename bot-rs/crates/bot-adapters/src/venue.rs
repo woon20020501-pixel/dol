@@ -51,7 +51,7 @@ pub struct VenueSnapshot {
     pub tick_size: f64,
 
     /// Mark-price deviation from mid in basis points: `(mark - mid) / mid * 1e4`.
-    /// Zero when mark is unavailable on the underlying venue API.
+    /// Zero when mark is unavailable; adapter must add a TODO in that case.
     pub mark_bias_bps: f64,
 
     // ── Depth ─────────────────────────────────────────────────────────────
@@ -68,7 +68,7 @@ pub struct VenueSnapshot {
     ///
     /// Must contain ≥ 5 points with distinct positive offsets.
     /// If the underlying orderbook only returns top-of-book, the adapter
-    /// generates a synthetic flat curve (see `PacificaReadOnlyAdapter`).
+    /// generates a synthetic flat curve — see TODO in `PacificaReadOnlyAdapter`.
     pub depth_curve: Vec<(f64, f64)>,
 
     // ── Funding ───────────────────────────────────────────────────────────
@@ -87,11 +87,11 @@ pub struct VenueSnapshot {
 
     // ── Volume / OI ───────────────────────────────────────────────────────
     /// 24-hour rolling trading volume in USD. Used for slippage model and
-    /// `LiveInputs.volume_24h`. Set to `Usd(0.0)` when unavailable.
+    /// `LiveInputs.volume_24h`. Set to `Usd(0.0)` when unavailable (with TODO).
     pub volume_24h_usd: Usd,
 
     /// Current open interest in USD. Used for slippage model and
-    /// `LiveInputs.open_interest`. Set to `Usd(0.0)` when unavailable.
+    /// `LiveInputs.open_interest`. Set to `Usd(0.0)` when unavailable (with TODO).
     pub open_interest_usd: Usd,
 }
 

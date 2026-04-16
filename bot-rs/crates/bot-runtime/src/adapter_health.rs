@@ -1,15 +1,15 @@
 //! Per-symbol adapter health telemetry.
 //!
 //! Tracks the "drops-and-continues" failure behavior of the tick engine so
-//! the dashboard can render a yellow/red warning glyph on symbols whose
-//! Pacifica `/book` endpoint has been flaky. Does NOT implement a full
-//! retry-and-degrade policy; `run_one_tick` already drops the failing venue
-//! and proceeds with the others, so demo safety is preserved. This module
-//! only adds the counter rollup used for telemetry.
+//! the dashboard can render a yellow/red warning glyph on symbols
+//! whose Pacifica `/book` endpoint has been flaky. Does NOT implement the
+//! retry-and-degrade policy; the current `run_one_tick` already drops
+//! the failing venue and proceeds with the others, so demo safety is
+//! preserved. This module only adds the counter rollup.
 //!
-//! If the policy ever needs to escalate to (b) — the full retry-and-
-//! degrade path — extend `SymbolHealth` with `cooldown_remaining`
-//! / `is_degraded_streak` fields and add a `tick_with_policy` method.
+//! If the policy ever needs to escalate to the full retry-and-degrade
+//! path, extend `SymbolHealth` with `cooldown_remaining` /
+//! `is_degraded_streak` fields and add a `tick_with_policy` method.
 //! The current struct shape is forward-compatible with that upgrade.
 
 use std::collections::BTreeMap;
@@ -31,7 +31,7 @@ pub struct SymbolHealth {
     /// True iff `consecutive_failures >= DEGRADATION_THRESHOLD`. The
     /// dashboard renders a red dot when this is true. Note: demo mode does
     /// NOT exclude the symbol from the decision loop when degraded — that
-    /// is a v1+ retry-and-degrade policy we have not yet implemented.
+    /// is the (b) retry-and-degrade policy which we have not implemented.
     /// The flag is advisory telemetry only in v0.
     pub is_degraded: bool,
     /// Last venue that failed to fetch for this symbol, as a readable

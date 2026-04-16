@@ -54,6 +54,16 @@ pub fn cap_routing(vault_gross: AnnualizedRate, mandate: &Mandate) -> MandateAll
 ///
 /// This is the minimum vault_gross that satisfies both mandate sub-floors.
 pub fn mandate_floor(mandate: &Mandate) -> AnnualizedRate {
+    assert!(
+        mandate.cut_customer.0 > 0.0,
+        "cut_customer must be positive (got {})",
+        mandate.cut_customer.0
+    );
+    assert!(
+        mandate.cut_buffer.0 > 0.0,
+        "cut_buffer must be positive (got {})",
+        mandate.cut_buffer.0
+    );
     let cust_floor = mandate.customer_apy_min.0 / mandate.cut_customer.0;
     let buf_floor = mandate.buffer_apy_min.0 / mandate.cut_buffer.0;
     AnnualizedRate(cust_floor.max(buf_floor))

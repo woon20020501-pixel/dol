@@ -20,7 +20,7 @@ import {
   useAuroraTelemetry,
 } from "@/hooks/useAuroraTelemetry";
 
-// Mandate constants from the v3.5.2 dry run.
+// Mandate constants from v3.5.2 dry run.
 // v3.5.2 production: gross 14.20% APY → customer 8.00% (capped),
 // buffer 4.78%, reserve 1.42%. Treat 8/14.2 ≈ 0.5634 as the
 // "customer share of gross before the cap kicks in".

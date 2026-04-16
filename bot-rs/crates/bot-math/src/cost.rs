@@ -11,7 +11,7 @@
 use bot_types::{Dimensionless, LiveInputs, PairId, Usd, Venue};
 
 // ---------------------------------------------------------------------------
-// Slippage constants (Python reference: strategy/strategy/cost_model.py)
+// Slippage constants (Python cost_model.py reference)
 // Calibrated conservative defaults; must be re-calibrated from Phase 1 dry-run fills.
 // ---------------------------------------------------------------------------
 const KAPPA: f64 = 0.0008; // √-impact coefficient (Almgren-Chriss class)
@@ -29,6 +29,7 @@ const CEILING: f64 = 0.02; // 200 bp ceiling (above this = uncrossable)
 ///
 /// Returns 0 when `n` ≤ 0.
 pub fn slippage(n: Usd, oi: Usd, vol_24h: Usd) -> Dimensionless {
+    debug_assert!(n.0 >= 0.0, "slippage: negative notional {}", n.0);
     if n.0 <= 0.0 {
         return Dimensionless(0.0);
     }

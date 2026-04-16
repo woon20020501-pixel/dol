@@ -83,16 +83,16 @@ struct DiagnosticsStub {
     ///
     /// - `"structural"` for XAU/XAG/PAXG — Pacifica and the HL `xyz:GOLD`/
     ///   `xyz:SILVER`/PAXG legs use independent oracles, so a small basis
-    ///   can open even when nothing is "wrong". Accepted structural tail
-    ///   risk, sized via venue concentration caps.
+    ///   can open even when nothing is "wrong". PM-accepted structural
+    ///   tail risk, sized via venue concentration caps.
     /// - `"minimal"` for crypto pairs — both legs reference the same
     ///   oracle abstraction (BTC-PERP on both sides), so drift is
     ///   execution-noise only.
     ///
-    /// The dashboard renders a warning glyph on rows flagged `structural`
-    /// so users see the honest disclosure.
+    /// The dashboard renders a warning glyph on rows flagged
+    /// `structural` so users see the honesty.
     oracle_divergence_risk: &'static str,
-    /// Per-symbol adapter fetch health (telemetry rollup).
+    /// Per-symbol adapter fetch health telemetry rollup.
     /// Rolled up from `AdapterHealthRegistry` each tick so the dashboard
     /// can flag flaky venues without hardcoding Pacifica/HL/etc.
     book_parse_failures: SymbolHealth,

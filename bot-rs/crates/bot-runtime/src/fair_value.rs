@@ -38,7 +38,7 @@ pub fn compute_weighted_fair_value(snapshots: &[VenueSnapshot]) -> FairValue {
 
     for snap in snapshots {
         let w = snap.depth_top_usd;
-        if w <= 0.0 {
+        if w <= 0.0 || !snap.mid_price.is_finite() {
             continue;
         }
         weighted_sum += snap.mid_price * w;
@@ -118,6 +118,30 @@ mod tests {
         assert!(!fv.healthy); // only 1 venue contributed
         assert_eq!(fv.contributing_venues.len(), 1);
         assert!((fv.p_star - 100_100.0).abs() < 1e-8);
+    }
+
+    #[test]
+    fn nan_mid_price_excluded() {
+        let snaps = vec![
+            make_snap(Venue::Hyperliquid, f64::NAN, 50_000.0, 0.04),
+            make_snap(Venue::Lighter, 100_100.0, 50_000.0, 0.03),
+            make_snap(Venue::Backpack, 100_000.0, 50_000.0, 0.02),
+        ];
+        let fv = compute_weighted_fair_value(&snaps);
+        assert!(fv.healthy); // 2 valid venues remain
+        assert_eq!(fv.contributing_venues.len(), 2);
+        assert!(fv.p_star.is_finite());
+    }
+
+    #[test]
+    fn inf_mid_price_excluded() {
+        let snaps = vec![
+            make_snap(Venue::Hyperliquid, f64::INFINITY, 50_000.0, 0.04),
+            make_snap(Venue::Lighter, 100_100.0, 50_000.0, 0.03),
+        ];
+        let fv = compute_weighted_fair_value(&snaps);
+        assert!(!fv.healthy); // only 1 valid
+        assert!(fv.p_star.is_finite());
     }
 
     #[test]

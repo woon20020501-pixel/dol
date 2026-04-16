@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// NOTE: The `sigma` field here is the raw Python-scale sigma (`[series_units / √hour]`).
 /// To obtain the `OuParams.sigma_ou` (hybrid `[AnnualizedRate / √hour]`) used elsewhere in
-/// the framework, multiply by 8760 (see the Python reference `stochastic.py`).
+/// the framework, multiply by 8760 — see the spec Part C.3.
 /// The fixture stores the raw value (pre-scaling), so parity tests compare `sigma` directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FitOuOutput {
@@ -56,6 +56,17 @@ pub struct FitOuOutput {
     pub t_statistic: f64,
 }
 
+impl FitOuOutput {
+    /// True when the AR(1) regression produced a degenerate fit (b outside
+    /// (0, 1)), meaning OU mean-reversion is not detected. Downstream code
+    /// MUST check this before using `mu`, `sigma`, or `theta` — those fields
+    /// contain NaN/0.0/Inf in the degenerate case (Python parity constraint).
+    #[inline]
+    pub fn is_degenerate(&self) -> bool {
+        self.b >= 1.0 || self.b <= 0.0
+    }
+}
+
 /// Fit OU process to a series of observations spaced `dt_hours` apart.
 ///
 /// Input series is a slice of `(timestamp_ms, rate)` pairs; only the rate values
@@ -69,7 +80,7 @@ pub struct FitOuOutput {
 /// Mirrors `stochastic.fit_ou` exactly including:
 /// - Left-fold sum ordering
 /// - `sigma_eps_sq = sse / max(n_reg - 2, 1)`
-/// - Degenerate-b branch returning NaN/Inf for degenerate inputs as documented
+/// - Degenerate-b branch returning NaN/Inf placeholders
 /// - SE(μ̂) from Phillips 1972 asymptotic formula
 pub fn fit_ou(series: &[(i64, f64)], dt_hours: f64) -> Result<FitOuOutput, FrameworkError> {
     let n = series.len();
@@ -819,7 +830,7 @@ mod tests {
     ///
     /// NOTE: This Rust reimplementation uses a simple LCG so results won't
     /// match Python's Mersenne Twister. Only used for structural sanity tests,
-    /// not for parity verification (parity tests use committed Python fixtures).
+    /// not for parity verification (parity tests use generated fixtures).
     fn generate_ou_sample(
         mu: f64,
         theta: f64,

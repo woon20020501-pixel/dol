@@ -54,7 +54,7 @@ pub fn break_even_hold_fixed_point(
     let mut tau = initial_tau_h;
     for _ in 0..max_iter {
         let d_eff = ou_time_averaged_spread(d0, mu, theta_ou, tau);
-        if d_eff.0 <= 0.0 {
+        if !d_eff.0.is_finite() || d_eff.0 <= 0.0 {
             return Err(FrameworkError::NegativeEffectiveSpread);
         }
         let tau_new = Hours(8760.0 * c_round_trip.0 * (1.0 + rho_comp.0) / d_eff.0);

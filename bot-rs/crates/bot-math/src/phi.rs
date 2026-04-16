@@ -66,7 +66,7 @@ mod tests {
         // (1 - e^-1) / 1 = 1 - 1/e
         let expected = 1.0 - (-1.0_f64).exp();
         assert!((phi(1.0) - expected).abs() < 1e-15);
-        // Documented value
+        // Spec documented value
         assert!((phi(1.0) - 0.6321205588).abs() < 1e-8);
     }
 

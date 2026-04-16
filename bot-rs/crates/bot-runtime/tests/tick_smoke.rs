@@ -197,10 +197,9 @@ async fn multi_symbol_10_smoke() {
     }
 
     // Use the 7 crypto symbols — all have fixtures on all 4 venues.
-    // RWA (XAU/XAG/PAXG) fixtures exist only on Pacifica/Hyperliquid due to
-    // upstream venue coverage gaps, so they would fail in the 4-venue DryRun
-    // layout used by this test. Crypto-only is sufficient to smoke the
-    // portfolio path.
+    // RWA (XAU/XAG/PAXG) fixtures exist only on Pacifica/Hyperliquid,
+    // so they would fail in the 4-venue DryRun layout used
+    // by this test. Crypto-only is sufficient to smoke the portfolio path.
     let symbols: Vec<String> = vec!["BTC", "ETH", "SOL", "BNB", "ARB", "AVAX", "SUI"]
         .into_iter()
         .map(|s| s.to_string())
@@ -283,9 +282,8 @@ async fn multi_symbol_10_smoke() {
     );
 
     // 2. At least one per-symbol tracker should change cumulative accrual.
-    // Per the PortfolioNav accounting model, each tracker starts at the FULL
-    // portfolio NAV ($10,000) so changes are reflected in
-    // `cumulative_accrual_usd`.
+    // Per PortfolioNav accounting model, each tracker starts at the FULL portfolio
+    // NAV ($10,000) so changes are reflected in `cumulative_accrual_usd`.
     let any_changed = portfolio_nav
         .trackers
         .values()

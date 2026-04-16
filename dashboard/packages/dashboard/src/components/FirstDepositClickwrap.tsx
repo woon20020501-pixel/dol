@@ -10,7 +10,7 @@ import Link from "next/link";
  * which version of the legal docs that wallet agreed to.
  *
  * Storage key: `dol_tos_accept_{wallet}_v0.1`. The version suffix lets
- * us force re-acceptance whenever the legal docs are bumped.
+ * us force re-acceptance whenever legal bumps the docs.
  *
  * Usage pattern:
  *   const { requireTos, modal } = useTosAcceptance(walletAddress);

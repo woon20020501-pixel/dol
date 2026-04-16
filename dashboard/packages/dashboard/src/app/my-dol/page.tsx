@@ -44,7 +44,8 @@ const LANDING_SPRING: Transition = {
   mass: 1.5,
 };
 
-const DOL_RATE = 0.075;
+import { DOL_APY } from "@/lib/constants";
+const DOL_RATE = DOL_APY;
 
 type Phase = "empty" | "descending" | "landed" | "active";
 
@@ -105,7 +106,8 @@ function MyDolInner() {
      cover the full redeem, Instant would revert with InsufficientBalance
      and MetaMask surfaces it as "exceeds max transaction gas limit".
      We grey out the Instant button before the user taps it so they get
-     a clean "use Scheduled" fallback instead of the raw gas error. */
+     a clean "use Scheduled" fallback instead of the raw gas error.
+     */
   const vaultCfg = getVaultConfig();
   const { data: vaultUsdcRaw, refetch: refetchVaultUsdc } = useReadContract({
     address: vaultCfg?.usdcAddress,

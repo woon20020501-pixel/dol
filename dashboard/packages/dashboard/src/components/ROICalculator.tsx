@@ -31,7 +31,9 @@ import { MagneticCard } from "./MagneticCard";
  * Matches how LiveCounter on the hero already works.
  */
 
-const APY = 0.075;
+import { DOL_APY } from "@/lib/constants";
+
+const APY = DOL_APY;
 
 const TIMEFRAMES = [
   { label: "In 1 week", days: 7 },

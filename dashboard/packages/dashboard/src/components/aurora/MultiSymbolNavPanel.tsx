@@ -20,8 +20,8 @@ import {
 import { AnimatedNumber } from "@/components/common/AnimatedNumber";
 
 /**
- * Multi-symbol NAV panel — the high-dimensional viz called for in the
- * strategy spec. Layers:
+ * Multi-symbol NAV panel — the high-dimensional viz for the 10-pair
+ * portfolio. Layers:
  *
  *   1. Hierarchical line chart
  *      - 1 THICK aggregate line (10-pair portfolio NAV vs $10k seed)
@@ -32,7 +32,7 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
  *   2. Sparkline strip — 10 tiles showing each symbol's NAV trajectory
  *      and live gain, sorted by current rank
  *   3. "10 → 46 pairs" production-bridge caption with canonical talking
- *      points from the strategy spec
+ *      points
  */
 export function MultiSymbolNavPanel() {
   const t = useAuroraTelemetry();

@@ -22,6 +22,11 @@ pub fn ou_time_averaged_spread(
     theta_ou: HourlyRate,
     tau_h: Hours,
 ) -> AnnualizedRate {
+    debug_assert!(
+        theta_ou.0 >= 0.0,
+        "theta_ou must be non-negative (got {})",
+        theta_ou.0
+    );
     let x = theta_ou.0 * tau_h.0;
     AnnualizedRate(mu.0 + (d0.0 - mu.0) * phi(x))
 }

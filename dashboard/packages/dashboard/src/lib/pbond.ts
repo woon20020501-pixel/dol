@@ -32,8 +32,8 @@ import { isValidAddress } from "./guards";
 
 // Dol contract fallback addresses (Base Sepolia, 2026-04-14)
 // Primary source is shared/contracts.json — these only trigger if JSON
-// is missing or the fields are absent. Updated to match the Dol
-// rename redeploy (commit 7c54f94). pBondSenior key is retained
+// is missing or the fields are absent. Updated to match the contracts'
+// Dol rename redeploy (commit 7c54f94). pBondSenior key is retained
 // in JSON for pipeline compatibility, but the value is the new Dol
 // contract address. pBondJunior is inactive in Phase 1 (juniorContract
 // set to 0x0 on the new Dol); kept as placeholder.

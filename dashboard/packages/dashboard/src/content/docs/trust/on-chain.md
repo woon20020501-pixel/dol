@@ -30,7 +30,7 @@ Before deployment, the contract suite passes:
 - **97.65 percent line coverage** on the Dol token (the wrapper you interact with)
 - **Slither static analysis: zero high-severity, zero medium-severity findings**
 
-The full test report and coverage data live in the `contracts/` folder of this repository. The tests are open source and you are welcome to run them yourself.
+The full test report and coverage data live in the `contracts` directory. The tests are open source and you are welcome to run them yourself.
 
 ## How to verify yourself
 

@@ -809,7 +809,7 @@ fn round_trip_cost() {
 #[test]
 #[ignore = "Phase 2 gated: lifecycle maps to a Python composite (lifecycle_annualized_return) with no single Phase 1 bot_math equivalent. Needs a dedicated lifecycle function in bot-math or bot-strategy-v3."]
 fn lifecycle() {
-    // Wired once lifecycle_annualized_return is ported to bot-math.
+    // Placeholder — will be wired when lifecycle_annualized_return is ported.
 }
 
 // ===========================================================================
@@ -837,5 +837,5 @@ fn hurst() {}
 fn expected_residual_income() {}
 
 #[test]
-#[ignore = "Phase 2 gated: dry_run_end_to_end harness not yet wired"]
+#[ignore = "Phase 2 gated: dry_run_end_to_end placeholder — not a real fixture"]
 fn dry_run_end_to_end() {}

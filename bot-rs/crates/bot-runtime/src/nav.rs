@@ -19,8 +19,8 @@ use crate::decision::PairDecision;
 /// Round-trip cost charged on every position open or rebalance.
 ///
 /// 10 bps ≈ taker fee on both legs (≈ 3-5 bps each on DEXes) + bid-ask spread
-///     + slippage estimate. This is a conservative default — live calibration
-///     via the `slippage_calibration` framework module is a v1+ task.
+///     + slippage estimate. This is a placeholder — real calibration via the
+///     `slippage_calibration` framework module is Phase 1 work.
 pub const ROUND_TRIP_COST_BPS: f64 = 10.0;
 
 /// One NAV observation.
@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn portfolio_nav_each_tracker_sees_full_nav() {
-        // Per the accounting model: portfolio starting NAV is $10k, each pair
+        // Portfolio starting NAV is $10k, each pair
         // notional is 1% of portfolio NAV ($100). The per-symbol tracker
         // is therefore initialized at the FULL portfolio NAV so that
         // `tracker.nav_usd` × 1% = $100 (not $10 with a sliced NAV).
