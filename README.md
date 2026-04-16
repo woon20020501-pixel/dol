@@ -2,13 +2,15 @@
 
 A consumer-first DeFi product that turns Pacifica's perp infrastructure into a simple, 3-tap yield experience.
 
+Built on Pacifica's performance, APIs, and builder infrastructure — packaged into a retail-ready product for everyday users.
+
 Dol is a market-neutral yield product for everyday crypto users. Deposit USDC, receive DOL 1:1, and redeem through a fast retail-style flow — without needing to understand funding, hedging, or cross-venue execution. Under the hood, Dol uses a Rust decision engine and Pacifica-native infrastructure to capture funding-rate differentials while minimizing directional exposure through matched same-asset hedges.
 
 ```
                        Simple UI
                            │
                            ▼
-       Deposit USDC ──► mint DOL (1 : 1) ──► instant burn → USDC
+       Deposit USDC ──► mint DOL (1:1 receipt) ──► redeem DOL → USDC
                            │
                            ▼
                 Rust decision engine (Aurora-Ω)
@@ -58,6 +60,8 @@ Dol is built to feel instant for normal user flows.
 Under normal conditions, users can move through a fast redemption path designed for a smooth retail experience. Under stressed conditions, the system is protected by buffer rules, guardian controls, and fallback redemption logic designed to preserve system integrity and user safety.
 
 We optimize for simplicity at the surface and discipline underneath.
+
+DOL is a receipt token representing a claim on a USDC-funded strategy vault. It is not an algorithmic stablecoin or an endogenous monetary asset.
 
 ---
 
@@ -156,9 +160,10 @@ cd contracts/packages/contracts && forge test
 ### Run the dashboard locally
 
 ```bash
-cd dashboard
+cd dashboard/packages/dashboard
+cp .env.example .env.local   # fill in Privy app ID, RPC URL, etc.
+cd ../..
 pnpm install
-cp packages/dashboard/.env.example packages/dashboard/.env.local  # fill in values
 pnpm --filter dashboard dev
 ```
 
@@ -192,11 +197,7 @@ Ten independent hedge pairs trading simultaneously. Each pair is long-on-one-ven
 
 ## Why Dol
 
-Most DeFi products are built for users who already understand crypto market structure.
-
-Dol is built for everyone else.
-
-Instead of asking users to navigate funding markets, cross-venue hedges, and perp mechanics directly, Dol abstracts that complexity into a clean product experience. The result is a Pacifica-native yield product that feels simple on the surface while remaining deeply engineered underneath.
+Dol abstracts away funding, hedging, and venue complexity into a clean, retail-friendly product experience built on Pacifica.
 
 ---
 
@@ -219,7 +220,7 @@ Dol grows in lockstep with [Pacifica's long-term vision](https://docs.pacifica.f
 
 **Live dashboard**: https://dol-finance.vercel.app
 
-**Pacifica builder code**: registered *(update with actual code)*
+**Pacifica builder code**: registered
 
 ---
 
@@ -242,4 +243,4 @@ MIT — see [`LICENSE`](./LICENSE).
 
 ---
 
-*Dol is the Korean word for "stone". A stone yields nothing on its own — put it in the right machine, and it becomes stable yield, accessible to anyone.*
+*Dol is the Korean word for "stone." In the right system, something inert becomes useful — simple on the surface, deeply engineered underneath.*
