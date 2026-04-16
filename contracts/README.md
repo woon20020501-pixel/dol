@@ -1,6 +1,6 @@
 # dol-contracts
 
-Pacifica FX Carry Vault — automated on-chain FX carry strategy vault.
+Pacifica FX Carry Vault 
 
 ## Monorepo Layout
 
