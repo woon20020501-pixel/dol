@@ -17,6 +17,7 @@
 
 pub mod breakeven;
 pub mod cost;
+pub mod cvar;
 pub mod impact;
 pub mod leverage;
 pub mod mfg;
@@ -28,6 +29,7 @@ pub mod routing;
 // Re-export all public items at crate root for ergonomic use.
 pub use breakeven::{break_even_hold_at_mean, break_even_hold_fixed_point};
 pub use cost::{round_trip_cost_model_c, slippage};
+pub use cvar::{cvar_empirical, cvar_ru};
 pub use impact::effective_spread_with_impact;
 pub use leverage::{bernstein_leverage_bound, critical_aum};
 pub use mfg::{capacity_ceiling, dol_sustainable_flow_per_pair, mfg_competitor_count};

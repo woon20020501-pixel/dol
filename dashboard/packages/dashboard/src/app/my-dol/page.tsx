@@ -107,7 +107,7 @@ function MyDolInner() {
      and MetaMask surfaces it as "exceeds max transaction gas limit".
      We grey out the Instant button before the user taps it so they get
      a clean "use Scheduled" fallback instead of the raw gas error.
-     */
+      */
   const vaultCfg = getVaultConfig();
   const { data: vaultUsdcRaw, refetch: refetchVaultUsdc } = useReadContract({
     address: vaultCfg?.usdcAddress,
@@ -258,12 +258,29 @@ function MyDolInner() {
       if (e.category === "user_rejected") {
         toast(e.title, { id: "redeem-req" });
       } else {
+        // Reverted on-chain: attach a "View tx" action so the user
+        // can inspect the revert reason directly on basescan. User-
+        // rejection path deliberately skipped — no tx to link to.
+        const action =
+          wd.isReverted && wd.revertedHash
+            ? {
+                label: "View tx",
+                onClick: () =>
+                  window.open(
+                    `${BASESCAN}/tx/${wd.revertedHash}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  ),
+              }
+            : undefined;
         toast.error(e.title, {
           id: "redeem-req",
           description: e.description,
+          action,
         });
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wd.requestError]);
 
   useEffect(() => {
@@ -300,11 +317,25 @@ function MyDolInner() {
   useEffect(() => {
     if (wd.claimError) {
       const e = translateError(wd.claimError);
+      const action =
+        wd.isReverted && wd.revertedHash
+          ? {
+              label: "View tx",
+              onClick: () =>
+                window.open(
+                  `${BASESCAN}/tx/${wd.revertedHash}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                ),
+            }
+          : undefined;
       toast.error(e.title, {
         id: "redeem-claim",
         description: e.description,
+        action,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wd.claimError]);
 
   /* Instant redeem toasts + InsufficientLiquidity fallback */
@@ -366,9 +397,22 @@ function MyDolInner() {
     if (e.category === "user_rejected") {
       toast(e.title, { id: "redeem-instant" });
     } else {
+      const action =
+        wd.isReverted && wd.revertedHash
+          ? {
+              label: "View tx",
+              onClick: () =>
+                window.open(
+                  `${BASESCAN}/tx/${wd.revertedHash}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                ),
+            }
+          : undefined;
       toast.error(e.title, {
         id: "redeem-instant",
         description: e.description,
+        action,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -712,15 +756,11 @@ function MyDolInner() {
             <GlassboxPanel />
           )}
 
-          {/* Legal */}
-          <div
-            className="mt-8 text-center px-2"
-            style={{
-              color: "#333333",
-              fontSize: "10px",
-              lineHeight: "1.5",
-            }}
-          >
+          {/* Legal — same fix as the landing page disclaimer. Previous
+              color: #333333 on black was effectively invisible (~1.5:1
+              contrast, fails WCAG AA). Risk warnings that users can't
+              read are a legal/liability issue, not a stylistic choice. */}
+          <div className="mt-8 px-2 text-center text-[11px] leading-relaxed text-white/40">
             Dol is not a bank. Each Dol is backed 1:1 by USDC. Numbers shown
             are a target, not a promise. Capital is at risk. Not available
             in the United States, Korea, or other restricted jurisdictions.

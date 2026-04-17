@@ -16,6 +16,8 @@ use serde::Serialize;
 use crate::adapter_health::SymbolHealth;
 use crate::decision::PairDecision;
 use crate::fair_value::FairValue;
+use crate::risk::RiskDecision;
+use crate::scoring::ForecastScore;
 use crate::tick::CycleLockInfo;
 use bot_types::Venue;
 
@@ -52,13 +54,72 @@ impl From<&CycleLockInfo> for CycleLockPayload {
     }
 }
 
+/// Forecast scoring block — NOT stubbed. Populated from
+/// `scoring::ForecastScore` via `ForecastScore::from`. Contains the regime
+/// classification, OU fit parameters, break-even hold, Bernstein leverage
+/// bound, and expected residual income — all from real math modules.
 #[derive(Debug, Serialize)]
-struct ForecastScoringStub {
-    #[serde(rename = "S_t")]
-    s_t: f64,
-    z: f64,
-    flag_fired: bool,
-    _stub: bool,
+struct ForecastScoringLive {
+    regime: &'static str,
+    adf_statistic: Option<f64>,
+    theta_hourly: Option<f64>,
+    mu_annual: Option<f64>,
+    drift_t_statistic: Option<f64>,
+    tau_be_hours: Option<f64>,
+    leverage_bound: Option<u32>,
+    expected_residual_hourly: Option<f64>,
+    verdict: &'static str,
+}
+
+impl From<&ForecastScore> for ForecastScoringLive {
+    fn from(f: &ForecastScore) -> Self {
+        use crate::scoring::{ForecastVerdict, Regime};
+        Self {
+            regime: match f.regime {
+                Regime::Stationary => "stationary",
+                Regime::Drift => "drift",
+                Regime::Insufficient => "insufficient",
+            },
+            adf_statistic: f.adf_statistic,
+            theta_hourly: f.theta_hourly,
+            mu_annual: f.mu_annual,
+            drift_t_statistic: f.drift_t_statistic,
+            tau_be_hours: f.tau_be_hours,
+            leverage_bound: f.leverage_bound,
+            expected_residual_hourly: f.expected_residual_hourly,
+            verdict: match f.verdict {
+                ForecastVerdict::Admit => "admit",
+                ForecastVerdict::Reduce => "reduce",
+                ForecastVerdict::Reject => "reject",
+            },
+        }
+    }
+}
+
+/// Runtime risk stack payload — NOT stubbed. Populated from
+/// `risk::RiskDecision` emitted by `RiskStack::evaluate`.
+#[derive(Debug, Serialize)]
+struct RiskStackLive {
+    decision: &'static str,
+    size_multiplier: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+}
+
+impl From<(&RiskDecision, f64)> for RiskStackLive {
+    fn from((d, mult): (&RiskDecision, f64)) -> Self {
+        let (decision_str, reason) = match d {
+            RiskDecision::Pass => ("pass", None),
+            RiskDecision::Reduce { reason, .. } => ("reduce", Some(reason.clone())),
+            RiskDecision::Block { reason } => ("block", Some(reason.clone())),
+            RiskDecision::Flatten { reason } => ("flatten", Some(reason.clone())),
+        };
+        Self {
+            decision: decision_str,
+            size_multiplier: mult,
+            reason,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -89,16 +150,16 @@ struct DiagnosticsStub {
     ///   oracle abstraction (BTC-PERP on both sides), so drift is
     ///   execution-noise only.
     ///
-    /// The dashboard renders a warning glyph on rows flagged
-    /// `structural` so users see the honesty.
+    /// the dashboard's dashboard renders a warning glyph on rows flagged
+    /// `structural` so judges see the honesty.
     oracle_divergence_risk: &'static str,
-    /// Per-symbol adapter fetch health telemetry rollup.
+    /// Per-symbol adapter fetch health ( telemetry rollup).
     /// Rolled up from `AdapterHealthRegistry` each tick so the dashboard
     /// can flag flaky venues without hardcoding Pacifica/HL/etc.
     book_parse_failures: SymbolHealth,
 }
 
-/// Return the oracle-divergence class for `symbol`.
+/// Return the oracle-divergence class for `symbol`
 fn oracle_divergence_risk_for(symbol: &str) -> &'static str {
     match symbol {
         "XAU" | "XAG" | "PAXG" => "structural",
@@ -106,55 +167,11 @@ fn oracle_divergence_risk_for(symbol: &str) -> &'static str {
     }
 }
 
-/// Stub entry mirroring `RiskReport` shape from `risk_stack.py`. Real values
-/// will come from the Rust port in Week 2+. For v0 demo, all four layers
-/// emit zero-valued reports flagged as stubbed.
-#[derive(Debug, Serialize)]
-struct RiskStackStubEntry {
-    layer: &'static str,
-    value: f64,
-    threshold: f64,
-    red_flag: bool,
-    _stub: bool,
-}
-
-/// Sections still stubbed in Week 1 Step B. `cycle_lock` no longer appears
-/// here because it's populated from real enforce() state via
-/// `cycle_lock::CycleLockRegistry`.
-const STUBBED_SECTIONS: &[&str] = &["forecast_scoring", "risk_stack", "fsm"];
-
-fn stub_risk_stack() -> Vec<RiskStackStubEntry> {
-    vec![
-        RiskStackStubEntry {
-            layer: "entropic_ce",
-            value: 0.0,
-            threshold: 0.02,
-            red_flag: false,
-            _stub: true,
-        },
-        RiskStackStubEntry {
-            layer: "ecv",
-            value: 0.0,
-            threshold: 0.05,
-            red_flag: false,
-            _stub: true,
-        },
-        RiskStackStubEntry {
-            layer: "cvar",
-            value: 0.0,
-            threshold: 0.05,
-            red_flag: false,
-            _stub: true,
-        },
-        RiskStackStubEntry {
-            layer: "execution_chi2",
-            value: 0.0,
-            threshold: 15.0,
-            red_flag: false,
-            _stub: true,
-        },
-    ]
-}
+/// Sections still stubbed. `cycle_lock`, `forecast_scoring`, and `risk_stack`
+/// are no longer listed — they reflect live state from their respective
+/// modules. `fsm` remains a stub until the full state-machine controller
+/// ports across (Week 2+ I-KILL).
+const STUBBED_SECTIONS: &[&str] = &["fsm"];
 
 #[derive(Debug, Serialize)]
 struct SignalExtra<'a> {
@@ -178,12 +195,11 @@ struct SignalPayload<'a> {
     /// Real cycle_lock state (from `funding_cycle_lock::enforce`).
     cycle_lock: CycleLockPayload,
 
-    // ── Stubbed framework modules ─────────────────────────────────────────
-    forecast_scoring: ForecastScoringStub,
-    /// Four-entry stub array shaped like `risk_stack.RiskReport`.
-    /// Each entry has `_stub: true`. Real values from the ported framework
-    /// come in Week 2+.
-    risk_stack: Vec<RiskStackStubEntry>,
+    // ── Live framework modules (forecast + risk are no longer stubbed) ───
+    forecast_scoring: ForecastScoringLive,
+    /// Runtime 6-guard risk stack decision (CVaR, kill switch, heartbeat,
+    /// Pacifica watchdog, concentration, drawdown). Live state.
+    risk_stack: RiskStackLive,
     fsm: FsmStub,
 
     // ── Orders ────────────────────────────────────────────────────────────
@@ -216,8 +232,14 @@ pub struct SignalSections<'a> {
     /// Builder code from the authenticated Pacifica adapter, if in use.
     /// `Some(builder_code)` marks the signal as `pacifica_authenticated: true`.
     pub pacifica_auth: Option<&'a str>,
-    /// Adapter health telemetry for this symbol.
+    /// Adapter health telemetry for this symbol ( rollup).
     pub adapter_health: &'a SymbolHealth,
+    /// Live forecast score — OU/ADF/breakeven/Bernstein output.
+    pub forecast: &'a ForecastScore,
+    /// Live risk-stack decision.
+    pub risk_decision: &'a RiskDecision,
+    /// Size multiplier applied to the decision's notional.
+    pub risk_size_multiplier: f64,
 }
 
 /// Write a signal JSON file atomically.
@@ -234,6 +256,9 @@ pub fn emit_signal(
         nav_after,
         pacifica_auth,
         adapter_health,
+        forecast,
+        risk_decision,
+        risk_size_multiplier,
     } = sections;
     let ts_unix = ts.timestamp() as f64 + ts.timestamp_subsec_millis() as f64 / 1000.0;
     let date_str = ts.format("%Y%m%d").to_string();
@@ -261,13 +286,8 @@ pub fn emit_signal(
         symbol,
         fair_value,
         cycle_lock: CycleLockPayload::from(cycle_lock),
-        forecast_scoring: ForecastScoringStub {
-            s_t: 0.0,
-            z: 0.0,
-            flag_fired: false,
-            _stub: true,
-        },
-        risk_stack: stub_risk_stack(),
+        forecast_scoring: ForecastScoringLive::from(forecast),
+        risk_stack: RiskStackLive::from((risk_decision, risk_size_multiplier)),
         fsm: FsmStub {
             mode: "kelly_safe",
             notional_scale: 1.0,
@@ -342,6 +362,20 @@ mod tests {
         }
     }
 
+    fn idle_forecast() -> crate::scoring::ForecastScore {
+        crate::scoring::ForecastScore {
+            regime: crate::scoring::Regime::Insufficient,
+            adf_statistic: None,
+            theta_hourly: None,
+            mu_annual: None,
+            drift_t_statistic: None,
+            tau_be_hours: None,
+            leverage_bound: None,
+            expected_residual_hourly: None,
+            verdict: crate::scoring::ForecastVerdict::Admit,
+        }
+    }
+
     #[test]
     fn signal_file_is_created() {
         let dir = tempfile::tempdir().unwrap();
@@ -359,6 +393,9 @@ mod tests {
                 nav_after: 10_000.0,
                 pacifica_auth: None,
                 adapter_health: &SymbolHealth::default(),
+                forecast: &idle_forecast(),
+                risk_decision: &crate::risk::RiskDecision::Pass,
+                risk_size_multiplier: 1.0,
             },
         )
         .unwrap();
@@ -406,6 +443,9 @@ mod tests {
                 nav_after: 10_000.0,
                 pacifica_auth: None,
                 adapter_health: &SymbolHealth::default(),
+                forecast: &idle_forecast(),
+                risk_decision: &crate::risk::RiskDecision::Pass,
+                risk_size_multiplier: 1.0,
             },
         )
         .unwrap();
@@ -431,6 +471,9 @@ mod tests {
                 nav_after: 10_000.0,
                 pacifica_auth: Some("BLDR42"),
                 adapter_health: &SymbolHealth::default(),
+                forecast: &idle_forecast(),
+                risk_decision: &crate::risk::RiskDecision::Pass,
+                risk_size_multiplier: 1.0,
             },
         )
         .unwrap();

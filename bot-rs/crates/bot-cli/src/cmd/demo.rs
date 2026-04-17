@@ -23,7 +23,9 @@ use bot_adapters::venue::VenueAdapter;
 use bot_runtime::adapter_health::AdapterHealthRegistry;
 use bot_runtime::clock::SimulatedClock;
 use bot_runtime::cycle_lock::CycleLockRegistry;
+use bot_runtime::history::FundingHistoryRegistry;
 use bot_runtime::nav::PortfolioNav;
+use bot_runtime::risk::RiskStack;
 use bot_runtime::signal::{emit_signal, SignalSections};
 use bot_runtime::tick::TickEngine;
 use bot_types::Venue;
@@ -61,7 +63,7 @@ pub struct DemoArgs {
     /// Use the authenticated Pacifica adapter (requires PACIFICA_API_KEY and
     /// PACIFICA_BUILDER_CODE env vars). Enables authenticated account/builder
     /// endpoints and sets `pacifica_authenticated: true` in signal JSON.
-    /// Implies --pacifica-live. No order submission. See docs/v0-punchlist.md.
+    /// Implies --pacifica-live. No order submission.
     #[arg(long, default_value_t = false)]
     pub pacifica_auth: bool,
 
@@ -137,7 +139,7 @@ pub async fn run(args: DemoArgs) -> Result<()> {
             }
             Err(e) => {
                 anyhow::bail!(
-                    "--pacifica-auth requires PACIFICA_API_KEY and PACIFICA_BUILDER_CODE.                      Error: {e}. See docs/v0-punchlist.md."
+                    "--pacifica-auth requires PACIFICA_API_KEY and PACIFICA_BUILDER_CODE.                      Error: {e}."
                 );
             }
         }
@@ -193,6 +195,15 @@ pub async fn run(args: DemoArgs) -> Result<()> {
     // ── Engine + portfolio NAV tracker + cycle-lock registry ──────────────
     let engine = TickEngine::new(adapters, symbols.clone());
     let mut portfolio_nav = PortfolioNav::new(args.starting_nav, &symbols);
+
+    // Runtime risk stack: 6-guard composite (CVaR, kill switch, heartbeat,
+    // Pacifica watchdog, venue concentration, drawdown stop).
+    // The kill-switch SIGINT handler is armed below.
+    let mut risk_stack = RiskStack::new(args.starting_nav);
+    let _kill_handler = risk_stack.kill_switch.arm_signal_handler();
+
+    // Funding history registry — per-symbol rolling series for OU/ADF fits.
+    let mut history = FundingHistoryRegistry::new();
     let mut cycle_locks = CycleLockRegistry::new();
     let mut adapter_health = AdapterHealthRegistry::new();
     let starting_nav = args.starting_nav;
@@ -278,6 +289,8 @@ pub async fn run(args: DemoArgs) -> Result<()> {
                     portfolio_nav.tracker_for(symbol),
                     &mut cycle_locks,
                     &mut adapter_health,
+                    &mut risk_stack,
+                    &mut history,
                     now_ms_sim,
                     dt_seconds_sim,
                 )
@@ -293,6 +306,9 @@ pub async fn run(args: DemoArgs) -> Result<()> {
                 nav_after: output.nav_after,
                 pacifica_auth: builder_code.as_deref(),
                 adapter_health: &output.adapter_health,
+                forecast: &output.forecast,
+                risk_decision: &output.risk_decision,
+                risk_size_multiplier: output.risk_size_multiplier,
             };
             match emit_signal(&args.signal_dir, symbol, ts, sections) {
                 Ok(path) => info!(path = %path.display(), "signal written"),
@@ -331,7 +347,8 @@ pub async fn run(args: DemoArgs) -> Result<()> {
 
     // Compute per-symbol cumulative accruals for top/bottom ranking.
     // Bps is **NAV-level** (portfolio-wide denominator) so it sums across
-    // symbols to the aggregate bps, matching the dashboard labels.
+    // symbols to the aggregate bps, matching the dashboard's dashboard labels.
+    // Matches  convention.
     let mut symbol_accruals: Vec<(String, f64, f64)> = symbols
         .iter()
         .map(|sym| {

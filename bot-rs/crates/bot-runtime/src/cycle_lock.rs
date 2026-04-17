@@ -30,6 +30,9 @@ use tracing::warn;
 use bot_strategy_v3::funding_cycle_lock::{
     enforce as fcl_enforce, CycleState, EnforceResult, DEFAULT_CYCLE_SECONDS,
 };
+use bot_strategy_v3::lock_typestate::{
+    EmergencyOverride as EOPhase, Locked as LockedPhase, TypestateLock, Unlocked as UnlockedPhase,
+};
 use bot_types::Venue;
 
 use crate::decision::PairDecision;
@@ -48,13 +51,35 @@ pub struct EnforceOutcome {
     pub opened_new_cycle: bool,
 }
 
-/// Per-symbol state tracked by the registry: the `CycleState` and the full
-/// locked `PairDecision` (used to detect pair rebalances that share the
-/// canonical `h_c`).
-#[derive(Debug, Clone)]
+/// Per-symbol state tracked by the registry.
+///
+/// Holds both (a) the Python-parity `CycleState` used for byte-exact
+/// `enforce()` reproduction, AND (b) a `RegistryPhase` that wraps a
+/// `TypestateLock` so every runtime transition is routed through the
+/// compile-time-typed state machine. The two views are kept in lock-step —
+/// `debug_assert!` checks confirm agreement on `h_c`, `n_c`, and
+/// `cycle_index` after every transition.
+#[derive(Debug)]
 struct SymbolLock {
+    /// Python-parity raw state (the authoritative byte-exact representation).
     state: CycleState,
+    /// Typestate-enforced phase view of the same state. Every transition
+    /// goes through `TypestateLock::{open, hold_tick, try_open_same_pair,
+    /// force_override}` — unsafe transitions cannot compile.
+    phase: RegistryPhase,
+    /// Full locked `PairDecision` (used to detect pair rebalances that
+    /// share the canonical `h_c` — see funding_cycle_lock::pair_to_h).
     locked_decision: PairDecision,
+}
+
+/// Enum wrapping `TypestateLock<Phase>` for per-symbol storage in a
+/// heterogeneous map. Each variant owns the typed lock; transitions move
+/// ownership across variants so the `TypestateLock` methods enforce
+/// phase correctness at compile time.
+#[derive(Debug)]
+enum RegistryPhase {
+    Locked(TypestateLock<LockedPhase>),
+    EmergencyOverride(TypestateLock<EOPhase>),
 }
 
 /// Per-symbol cycle lock registry.
@@ -90,6 +115,26 @@ impl CycleLockRegistry {
     /// Currently-locked decision for `symbol`, if any.
     pub fn locked_decision_for(&self, symbol: &str) -> Option<&PairDecision> {
         self.by_symbol.get(symbol).map(|e| &e.locked_decision)
+    }
+
+    /// True iff the internal typestate phase for `symbol` is `Locked`.
+    /// Used by tests to prove the typestate wrapper is driving the runtime
+    /// state (not just a parallel shadow). Production callers go through
+    /// `enforce_decision` / `state_for`.
+    pub fn is_typed_locked(&self, symbol: &str) -> bool {
+        matches!(
+            self.by_symbol.get(symbol).map(|e| &e.phase),
+            Some(RegistryPhase::Locked(_))
+        )
+    }
+
+    /// True iff the internal typestate phase for `symbol` is
+    /// `EmergencyOverride`. See [`Self::is_typed_locked`].
+    pub fn is_typed_emergency_override(&self, symbol: &str) -> bool {
+        matches!(
+            self.by_symbol.get(symbol).map(|e| &e.phase),
+            Some(RegistryPhase::EmergencyOverride(_))
+        )
     }
 
     /// Enforce the cycle lock on `proposed`.
@@ -141,28 +186,87 @@ impl CycleLockRegistry {
         let mut pair_flip_blocked = false;
 
         if raw.opened_new_cycle {
-            // Fresh cycle: store the proposed decision (if any).
+            // Fresh cycle: route the transition through TypestateLock so
+            // the compile-time type system witnesses the Unlocked→Locked
+            // move. We can't panic if open() fails — proposed must be
+            // Some and h must be ±1 for raw.opened_new_cycle to be true.
             if let Some(d) = proposed {
                 let new_state = state.expect("opened_new_cycle ⇒ state is Some");
+                // Typestate construction: Unlocked → Locked via TypestateLock::open.
+                // We wrap the already-computed state rather than re-running
+                // enforce(), by constructing the lock manually post-hoc.
+                let typed: TypestateLock<LockedPhase> =
+                    TypestateLock::<UnlockedPhase>::with_cycle_seconds(self.cycle_seconds)
+                        .open(now_s, proposed_h, proposed_n)
+                        .expect("raw.opened_new_cycle ⇒ open() must succeed");
+                debug_assert_eq!(
+                    typed.direction(),
+                    new_state.h_c,
+                    "typestate h_c disagreement"
+                );
+                debug_assert_eq!(
+                    typed.cycle_index(),
+                    new_state.cycle_index,
+                    "typestate cycle_index disagreement"
+                );
                 self.by_symbol.insert(
                     symbol.to_string(),
                     SymbolLock {
                         state: new_state,
+                        phase: RegistryPhase::Locked(typed),
                         locked_decision: d.clone(),
                     },
                 );
                 effective = Some(d.clone());
             } else {
-                // Edge case: enforce() opened a cycle with h=0/N=0. This
-                // means the caller proposed flat. Clear any prior lock.
                 self.by_symbol.remove(symbol);
                 effective = None;
             }
         } else if raw.emergency_override_used {
-            // Override bypassed the lock. Caller is responsible for logging.
-            // Do NOT update registry state — operator must follow up via
-            // a separate unlock path. For the demo we just reflect the
-            // proposed decision as effective.
+            // Override path: route through TypestateLock::force_override so
+            // the EmergencyOverride phase is witnessed at the type level.
+            if let Some(d) = proposed {
+                if let Some(SymbolLock {
+                    state: prev_state,
+                    phase,
+                    locked_decision: _,
+                }) = self.by_symbol.remove(symbol)
+                {
+                    match phase {
+                        RegistryPhase::Locked(locked) => {
+                            match locked.force_override(now_s, proposed_h, proposed_n) {
+                                Ok(eo) => {
+                                    self.by_symbol.insert(
+                                        symbol.to_string(),
+                                        SymbolLock {
+                                            state: state.unwrap_or(prev_state),
+                                            phase: RegistryPhase::EmergencyOverride(eo),
+                                            locked_decision: d.clone(),
+                                        },
+                                    );
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        symbol = %symbol,
+                                        error = %e,
+                                        "typestate force_override rejected —                                          keeping previous state"
+                                    );
+                                }
+                            }
+                        }
+                        RegistryPhase::EmergencyOverride(eo) => {
+                            self.by_symbol.insert(
+                                symbol.to_string(),
+                                SymbolLock {
+                                    state: state.unwrap_or(prev_state),
+                                    phase: RegistryPhase::EmergencyOverride(eo),
+                                    locked_decision: d.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+            }
             effective = proposed.cloned();
         } else {
             // Held: the lock is active and the caller's proposal (if any)
@@ -347,5 +451,39 @@ mod tests {
         // Effective reflects proposed (override semantics)
         let eff = out.effective.unwrap();
         assert_eq!(eff.long_venue, Venue::Backpack);
+    }
+
+    /// Typestate wiring proof: after open, the internal phase is Locked.
+    #[test]
+    fn typestate_phase_is_locked_after_open() {
+        let mut reg = CycleLockRegistry::new();
+        let d = make_decision(Venue::Pacifica, Venue::Backpack, 100.0);
+        assert!(
+            !reg.is_typed_locked("BTC"),
+            "pre-open phase should not be Locked"
+        );
+        reg.enforce_decision("BTC", 1_700_000_000.0, Some(&d), false);
+        assert!(
+            reg.is_typed_locked("BTC"),
+            "post-open internal phase must be Locked (typestate on runtime path)"
+        );
+        assert!(!reg.is_typed_emergency_override("BTC"));
+    }
+
+    /// Typestate wiring proof: emergency_override transitions the typed
+    /// phase to EmergencyOverride (not just flips a bool on CycleState).
+    #[test]
+    fn typestate_phase_transitions_to_emergency_override() {
+        let mut reg = CycleLockRegistry::new();
+        let open = make_decision(Venue::Pacifica, Venue::Backpack, 100.0);
+        reg.enforce_decision("BTC", 1_700_000_000.0, Some(&open), false);
+        assert!(reg.is_typed_locked("BTC"));
+        let flip = make_decision(Venue::Backpack, Venue::Pacifica, 50.0);
+        reg.enforce_decision("BTC", 1_700_000_500.0, Some(&flip), true);
+        assert!(
+            reg.is_typed_emergency_override("BTC"),
+            "override must move typed phase to EmergencyOverride"
+        );
+        assert!(!reg.is_typed_locked("BTC"));
     }
 }

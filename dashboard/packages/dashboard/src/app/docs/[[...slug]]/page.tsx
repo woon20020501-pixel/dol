@@ -15,7 +15,7 @@ import { renderMarkdown } from "@/lib/markdown";
  *
  * Slug segments map 1:1 to directories. If the slug doesn't resolve to
  * a real markdown file, we surface Next.js's built-in 404 rather than
- * a custom page.
+ * a custom page —.
  *
  * The `/docs` landing page renders without the sidebar (marketing-style
  * intro), every sub-page renders with it (reference layout). This

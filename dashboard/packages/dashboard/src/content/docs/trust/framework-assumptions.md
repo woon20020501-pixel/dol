@@ -20,7 +20,7 @@
   with concrete venue-specific numbers. By then partnership
   conversations are settled and the explicit version is more
   appropriate. The earlier draft is preserved in git history
-  (commit `9cf75aa` `[C/assumptions]`).
+  (commit `9cf75aa`).
 -->
 
 # Framework assumptions

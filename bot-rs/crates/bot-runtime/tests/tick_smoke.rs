@@ -16,6 +16,7 @@ use bot_adapters::venue::VenueAdapter;
 use bot_runtime::adapter_health::AdapterHealthRegistry;
 use bot_runtime::cycle_lock::CycleLockRegistry;
 use bot_runtime::nav::{NavTracker, PortfolioNav};
+use bot_runtime::risk::RiskStack;
 use bot_runtime::signal::SignalSections;
 use bot_runtime::tick::TickEngine;
 use bot_types::Venue;
@@ -70,6 +71,8 @@ async fn three_ticks_btc_smoke() {
     let mut nav = NavTracker::new(10_000.0);
     let mut cycle_locks = CycleLockRegistry::new();
     let mut adapter_health = AdapterHealthRegistry::new();
+    let mut risk_stack = RiskStack::new(10_000.0);
+    let mut history = bot_runtime::history::FundingHistoryRegistry::new();
     let signal_dir = tempfile::tempdir().unwrap();
 
     let dt_seconds = 10.0; // simulated 10-second ticks
@@ -83,6 +86,8 @@ async fn three_ticks_btc_smoke() {
                 &mut nav,
                 &mut cycle_locks,
                 &mut adapter_health,
+                &mut risk_stack,
+                &mut history,
                 sim_ms,
                 dt_seconds,
             )
@@ -128,6 +133,9 @@ async fn three_ticks_btc_smoke() {
                 nav_after: output.nav_after,
                 pacifica_auth: None,
                 adapter_health: &output.adapter_health,
+                forecast: &output.forecast,
+                risk_decision: &output.risk_decision,
+                risk_size_multiplier: output.risk_size_multiplier,
             },
         )
         .expect("signal emit should succeed");
@@ -197,8 +205,8 @@ async fn multi_symbol_10_smoke() {
     }
 
     // Use the 7 crypto symbols — all have fixtures on all 4 venues.
-    // RWA (XAU/XAG/PAXG) fixtures exist only on Pacifica/Hyperliquid,
-    // so they would fail in the 4-venue DryRun layout used
+    // RWA (XAU/XAG/PAXG) fixtures exist only on Pacifica/Hyperliquid per
+    // , so they would fail in the 4-venue DryRun layout used
     // by this test. Crypto-only is sufficient to smoke the portfolio path.
     let symbols: Vec<String> = vec!["BTC", "ETH", "SOL", "BNB", "ARB", "AVAX", "SUI"]
         .into_iter()
@@ -209,6 +217,8 @@ async fn multi_symbol_10_smoke() {
     let mut portfolio_nav = PortfolioNav::new(10_000.0, &symbols);
     let mut cycle_locks = CycleLockRegistry::new();
     let mut adapter_health = AdapterHealthRegistry::new();
+    let mut risk_stack = RiskStack::new(10_000.0);
+    let mut history = bot_runtime::history::FundingHistoryRegistry::new();
     let signal_dir = tempfile::tempdir().unwrap();
 
     // Set up a temp nav.jsonl file.
@@ -231,6 +241,8 @@ async fn multi_symbol_10_smoke() {
                     portfolio_nav.tracker_for(symbol),
                     &mut cycle_locks,
                     &mut adapter_health,
+                    &mut risk_stack,
+                    &mut history,
                     sim_ms,
                     dt_seconds,
                 )
@@ -250,6 +262,9 @@ async fn multi_symbol_10_smoke() {
                     nav_after: output.nav_after,
                     pacifica_auth: None,
                     adapter_health: &output.adapter_health,
+                    forecast: &output.forecast,
+                    risk_decision: &output.risk_decision,
+                    risk_size_multiplier: output.risk_size_multiplier,
                 },
             )
             .expect("signal emit should succeed");
@@ -282,7 +297,7 @@ async fn multi_symbol_10_smoke() {
     );
 
     // 2. At least one per-symbol tracker should change cumulative accrual.
-    // Per PortfolioNav accounting model, each tracker starts at the FULL portfolio
+    // Per PortfolioNav  fix each tracker starts at the FULL portfolio
     // NAV ($10,000) so changes are reflected in `cumulative_accrual_usd`.
     let any_changed = portfolio_nav
         .trackers
@@ -344,6 +359,8 @@ async fn nav_changes_across_ticks() {
     let mut nav = NavTracker::new(10_000.0);
     let mut cycle_locks = CycleLockRegistry::new();
     let mut adapter_health = AdapterHealthRegistry::new();
+    let mut risk_stack = RiskStack::new(10_000.0);
+    let mut history = bot_runtime::history::FundingHistoryRegistry::new();
 
     let mut nav_values = Vec::new();
     let mut sim_ms: i64 = 1_776_000_000_000; // arbitrary fixed simulated start
@@ -355,6 +372,8 @@ async fn nav_changes_across_ticks() {
                 &mut nav,
                 &mut cycle_locks,
                 &mut adapter_health,
+                &mut risk_stack,
+                &mut history,
                 sim_ms,
                 5.0,
             )

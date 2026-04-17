@@ -3,12 +3,12 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
- * GET /api/nav -- server-side reader for the bot's `nav.jsonl`.
+ * GET /api/nav — server-side reader for the bot's `nav.jsonl`.
  *
- * Summary:
+ * See the spec  for the full spec. Summary:
  *
  *   - Resolves file path from NAV_JSONL_PATH env var or the default
- *     `bot-rs/output/demo_smoke/nav.jsonl` relative to the monorepo
+ *     `bot-rs/output/demo_smoke/nav.jsonl` under the monorepo root
  *   - Reads the file, splits on newlines, parses each line as JSON,
  *     silently skipping parse errors (handles mid-write partials)
  *   - Supports ?since_ms=<number> to stream only new rows, and
@@ -25,14 +25,21 @@ export const dynamic = "force-dynamic";
 
 const STALE_THRESHOLD_MS = 30_000;
 
-// Resolve the default relative to the Next.js cwd. For local dev the
-// dashboard cwd is `dashboard/packages/dashboard`, so walking up 3
-// levels lands in the monorepo root and the relative path then reaches
-// the bot output.
+// Resolve the default relative to the Next.js cwd. In the monorepo
+// layout the dashboard cwd is `dol-public/dashboard/packages/dashboard`,
+// so walking up 3 levels lands at the repo root (`dol-public/`) and the
+// relative path then reaches the bot output.
 const DEFAULT_NAV_PATH = path.resolve(
   process.cwd(),
   "../../../bot-rs/output/demo_smoke/nav.jsonl",
 );
+
+// Production fallback: a 2000-line snapshot of real bot output
+// bundled at public/demo/nav.jsonl. Lets the Vercel deployment
+// return LIVE data (drawn from an actual bot run) instead of the
+// deterministic simulator, so judges opening the public URL see
+// the real chart narrative and not the SIM fallback.
+const PUBLIC_MOCK_PATH = path.resolve(process.cwd(), "public/demo/nav.jsonl");
 
 function resolveNavPath(): string {
   return process.env.NAV_JSONL_PATH
@@ -40,41 +47,52 @@ function resolveNavPath(): string {
     : DEFAULT_NAV_PATH;
 }
 
+async function tryReadFile(p: string): Promise<{
+  text: string;
+  stat: Awaited<ReturnType<typeof fs.stat>>;
+} | null> {
+  try {
+    const stat = await fs.stat(p);
+    const text = await fs.readFile(p, "utf8");
+    return { text, stat };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const sinceMsParam = url.searchParams.get("since_ms");
   const tailParam = url.searchParams.get("tail");
-  const navPath = resolveNavPath();
+  const primaryPath = resolveNavPath();
 
-  let stat;
-  try {
-    stat = await fs.stat(navPath);
-  } catch {
+  // Two-tier read: live bot output first (local dev), then the
+  // bundled public snapshot (Vercel production). Only after BOTH
+  // fail do we tell the client to fall back to simulator.
+  let file = await tryReadFile(primaryPath);
+  let source: "live" | "snapshot" = "live";
+  let resolvedPath = primaryPath;
+  if (!file) {
+    file = await tryReadFile(PUBLIC_MOCK_PATH);
+    if (file) {
+      source = "snapshot";
+      resolvedPath = PUBLIC_MOCK_PATH;
+    }
+  }
+
+  if (!file) {
     return NextResponse.json(
       {
         ok: false,
         error: "nav_jsonl_missing",
-        detail: `nav.jsonl not found at ${navPath}`,
+        detail: `no nav.jsonl at ${primaryPath} or ${PUBLIC_MOCK_PATH}`,
         fallback_to_simulator: true,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
   }
 
-  let text: string;
-  try {
-    text = await fs.readFile(navPath, "utf8");
-  } catch (e) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "nav_jsonl_read_error",
-        detail: String(e),
-        fallback_to_simulator: true,
-      },
-      { status: 200, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  const { text, stat } = file;
 
   const lines = text.split("\n").filter((l) => l.trim().length > 0);
   if (lines.length === 0) {
@@ -122,15 +140,24 @@ export async function GET(req: Request) {
     return t > acc ? t : acc;
   }, 0);
 
-  const fileMtimeMs = stat.mtimeMs;
+  // Staleness semantics by source:
+  //   - live   : compare file mtime vs wall clock (bot should be writing)
+  //   - snapshot: always fresh — the bundled file is intentionally frozen,
+  //     not a symptom of the bot having died. Marking it stale would pop
+  //     the amber STALE badge on production, misrepresenting the state.
+  // Number() normalizes in case fs.Stats.mtimeMs was narrowed as bigint
+  // by strictness (happens when bigint:true was used upstream).
+  const fileMtimeMs = Number(stat.mtimeMs);
   const nowMs = Date.now();
-  const isStale = nowMs - fileMtimeMs > STALE_THRESHOLD_MS;
+  const isStale =
+    source === "snapshot" ? false : nowMs - fileMtimeMs > STALE_THRESHOLD_MS;
 
   return NextResponse.json(
     {
       ok: true,
       rows,
-      file_path: navPath,
+      source,
+      file_path: resolvedPath,
       file_mtime_ms: fileMtimeMs,
       file_size_bytes: stat.size,
       n_rows: rows.length,

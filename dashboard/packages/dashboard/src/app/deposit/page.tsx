@@ -29,6 +29,7 @@ import {
   BASE_SEPOLIA_ETH_FAUCET,
   type ErrorCategory,
 } from "@/lib/errors";
+import { mergeTxError, isRevertError } from "@/lib/txState";
 import DolHeroImage from "@/components/DolHeroImage";
 import LiveCounter from "@/components/LiveCounter";
 import WalletChip from "@/components/WalletChip";
@@ -163,7 +164,7 @@ function DepositPageInner() {
   // ceiling for Phase 1, derived from Pacifica's Closed Beta
   // per-account equity cap. The doc promised "deposits will be
   // limited and the frontend will surface a clear capacity-reached
-  // state instead of silently accepting money." Until the contracts add
+  // state instead of silently accepting money." Until the contracts adds
   // a contract-level maxTotalAssets, this is that enforcement at
   // the frontend layer: we read the Dol contract's current totalSupply
   // (which tracks USDC value at near-1:1 during Phase 1), compute
@@ -214,7 +215,16 @@ function DepositPageInner() {
     reset: resetApprove,
     error: approveError,
   } = useWriteContract();
-  const { isSuccess: isApproveConfirmed } = useWaitForTransactionReceipt({
+  // Receipt-query isError fires for both on-chain reverts AND RPC
+  // transport failures. We merge the receipt error into the existing
+  // error useEffect below so a reverted approve doesn't silently
+  // return the button to idle with no feedback. See useDeposit for
+  // the equivalent treatment in the hooks path.
+  const {
+    isSuccess: isApproveConfirmed,
+    isError: hasApproveReceiptError,
+    error: approveReceiptError,
+  } = useWaitForTransactionReceipt({
     hash: approveTxHash,
     chainId: TARGET_CHAIN_ID,
   });
@@ -233,7 +243,11 @@ function DepositPageInner() {
     reset: resetDeposit,
     error: depositError,
   } = useWriteContract();
-  const { isSuccess: isDepositConfirmed } = useWaitForTransactionReceipt({
+  const {
+    isSuccess: isDepositConfirmed,
+    isError: hasDepositReceiptError,
+    error: depositReceiptError,
+  } = useWaitForTransactionReceipt({
     hash: depositTxHash,
     chainId: TARGET_CHAIN_ID,
   });
@@ -344,8 +358,23 @@ function DepositPageInner() {
   const [lastErrorCategory, setLastErrorCategory] =
     useState<ErrorCategory | null>(null);
 
+  // Merge both error sources: writeContract errors (wallet rejection,
+  // gas estimate) and receipt-query errors (on-chain revert or RPC
+  // failure). Previously this effect only watched writeContract errors,
+  // so a tx that was successfully submitted but reverted on-chain left
+  // the UI with no feedback at all. mergeTxError gives precedence to
+  // the writeContract error (fires first in the lifecycle).
+  const approveCombinedErr = mergeTxError(approveError, approveReceiptError);
+  const depositCombinedErr = mergeTxError(depositError, depositReceiptError);
+  const revertedTxHash =
+    hasApproveReceiptError && isRevertError(approveReceiptError)
+      ? approveTxHash
+      : hasDepositReceiptError && isRevertError(depositReceiptError)
+        ? depositTxHash
+        : null;
+
   useEffect(() => {
-    const rawErr = approveError || depositError;
+    const rawErr = approveCombinedErr || depositCombinedErr;
     if (!rawErr) return;
     const e = translateError(rawErr);
     setLastErrorCategory(e.category);
@@ -356,25 +385,49 @@ function DepositPageInner() {
       return;
     }
 
+    // For faucet categories, action is the helper link. For reverted
+    // on-chain txs, action deep-links to basescan so the user can
+    // inspect the revert reason directly. User rejection has no hash
+    // to link so we fall back to no action.
+    const action =
+      e.category === "insufficient_usdc"
+        ? {
+            label: "Get test USDC",
+            onClick: () =>
+              window.open(
+                BASE_SEPOLIA_USDC_FAUCET,
+                "_blank",
+                "noopener,noreferrer",
+              ),
+          }
+        : e.category === "insufficient_eth"
+          ? {
+              label: "Get test ETH",
+              onClick: () =>
+                window.open(
+                  BASE_SEPOLIA_ETH_FAUCET,
+                  "_blank",
+                  "noopener,noreferrer",
+                ),
+            }
+          : revertedTxHash
+            ? {
+                label: "View tx",
+                onClick: () =>
+                  window.open(
+                    `${BASESCAN}/tx/${revertedTxHash}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  ),
+              }
+            : undefined;
+
     toast.error(e.title, {
       description: e.description,
-      action:
-        e.category === "insufficient_usdc"
-          ? {
-              label: "Get test USDC",
-              onClick: () =>
-                window.open(BASE_SEPOLIA_USDC_FAUCET, "_blank", "noopener,noreferrer"),
-            }
-          : e.category === "insufficient_eth"
-            ? {
-                label: "Get test ETH",
-                onClick: () =>
-                  window.open(BASE_SEPOLIA_ETH_FAUCET, "_blank", "noopener,noreferrer"),
-              }
-            : undefined,
+      action,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approveError, depositError]);
+  }, [approveCombinedErr, depositCombinedErr, revertedTxHash]);
 
   // Clear the helper hint once the user touches the input again
   useEffect(() => {
@@ -816,8 +869,11 @@ function DepositPageInner() {
               )}
             </div>
 
-            <p className="mt-6 text-center text-[11px] text-white/30">
+            <p className="mt-6 text-center text-[11px] text-white/55">
               Safe &middot; Instant &middot; Cash out anytime
+            </p>
+            <p className="mt-2 text-center text-[11px] text-white/40">
+              The 7.5% APY is a target, not a guarantee. Capital is at risk.
             </p>
 
             {/* Verify-before-signing hint — a passive one-liner.

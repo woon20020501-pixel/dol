@@ -45,7 +45,7 @@ Current state: **BLOCKED.** The demo path is dry-run only by construction — `V
 
 **Color key:**
 - 🟢 Active = Rust implementation exists, parity-tested, wired into tick pipeline
-- 🟡 Partial = simplified placeholder in demo, does not yet match framework contract
+- 🟡 Partial = simplified conservative default in demo, does not yet match framework contract
 - 🔴 Missing = no Rust implementation; stubbed or absent from signal JSON
 
 **Hard requirement:** every 🔴 must become 🟢 for the corresponding invariant to be live-safe. PM may explicitly waive a 🟡 or 🔴 for a specific rollout tier (e.g., "Tier 0 paper trading on $10 notional for 24h is acceptable with I-DEPTH partial"), but the waiver must cite the rollout tier and the reason.
@@ -75,7 +75,7 @@ The Aurora-Ω v0 minimum viable subset is 9 framework modules plus 3 bot-owned g
 - `stochastic::expected_residual_income`
 - `stochastic::fit_drift` — drift regime fit
 
-These are Phase 2a deliverables and are available for the decision engine when the full pipeline is wired up. They are NOT required for v0 per §3.5, but they anchor the v3.5.2 portfolio core layer.
+These are Phase 2a deliverables and are available for the decision engine when the full pipeline is wired up. They are NOT required for v0 , but they anchor the v3.5.2 portfolio core layer.
 
 ---
 
@@ -110,11 +110,11 @@ Parameters that must be refit from real data BEFORE live capital:
 - [ ] `Kalman2State.q_p / q_d / r` — 24–48h venue mid observations
 - [ ] `forecast_scoring` baseline ring — warm-start from `dry_run_v3_5.py` on 60-day historical data
 - [ ] `DEFAULT_BUDGET_99` — current values are from LHS (Appendix C, 100K scenarios); Phase 1 real losses should refine
-- [ ] `cost_model.SLIPPAGE_IMPACT_COEFFICIENT` (`= 0.0008` Phase 0 placeholder) — must be refit before any promotion
+- [ ] `cost_model.SLIPPAGE_IMPACT_COEFFICIENT` (`= 0.0008` Phase 0 conservative default) — must be refit before any promotion
 
 OK to defer past Tier 1:
 - `toxicity_filter.beta` ridge refit (stub `LinearToxicityModel` is safe)
-- `latency_penalty.sigma_price_per_sqrts` per-venue (default placeholder is conservative)
+- `latency_penalty.sigma_price_per_sqrts` per-venue (default conservative default is conservative)
 - `fsm_controller.DEFAULT_MAX_STEP` (`= 0.02`, reasonable starting guard)
 - `funding_bandit` exploration constant (`= √2`, standard)
 

@@ -6,7 +6,7 @@
  *
  *   # FAQ
  *   **Version ...**
- *   > Format note for dashboard integration: ...   <- strip
+ *   > Format note for the dashboard integration: ...   ← strip
  *   ---
  *   ## Category 1 — General
  *   ### Question A
@@ -16,7 +16,7 @@
  *   ---
  *   ## Category 2 — ...
  *   ...
- *   ## Category metadata (for dashboard tab generation)   <- strip everything from here on
+ *   ## Category metadata (for the dashboard tab generation)   ← strip everything from here on
  *
  * Answers can span multiple paragraphs. Category dividers are `---`
  * horizontal rules, which we ignore since the `## Category` heading
@@ -67,7 +67,7 @@ export function parseFaq(raw: string): FaqCategory[] {
   // Drop the Agent-C format-note blockquote wherever it sits near the top.
   // Using [\s\S] instead of the `s` (dotall) flag for es2017 compat.
   const sansNote = text.replace(
-    /^>\s*\*\*Format note for dashboard[\s\S]*?(?=\n\n|\n#)/m,
+    /^>\s*\*\*Format note for the dashboard[\s\S]*?(?=\n\n|\n#)/m,
     "",
   );
 

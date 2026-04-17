@@ -3,7 +3,7 @@ import Link from "next/link";
 /**
  * Minimal site footer carrying legal links + copyright. Sits on every
  * top-level page (`/`, `/deposit`, `/my-dol`) so the legal pages are
- * always one click away.
+ * always one click away — required by .
  *
  * Kept visually quiet so it doesn't compete with hero content. Mobile
  * stacks the links above the copyright line.
@@ -48,8 +48,9 @@ export function SiteFooter() {
           </Link>
         </nav>
 
-        <div className="text-center sm:text-right">
-          Dol is not a bank. Not FDIC insured. Crypto involves risk of loss.
+        <div className="text-center sm:text-right sm:max-w-sm">
+          Dol is not a bank. Not FDIC insured. Not investment, legal, or
+          tax advice. Crypto involves risk of loss. Do your own research.
         </div>
       </div>
     </footer>

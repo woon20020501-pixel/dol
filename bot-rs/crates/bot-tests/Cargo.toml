@@ -17,6 +17,8 @@ serde_json       = { workspace = true }
 bot-types        = { path = "../bot-types" }
 bot-math         = { path = "../bot-math" }
 bot-strategy-v3  = { path = "../bot-strategy-v3" }
+bot-adapters     = { path = "../bot-adapters" }
+bot-runtime      = { path = "../bot-runtime" }
 serde            = { workspace = true }
 serde_json       = { workspace = true }
 hashbrown        = { workspace = true }

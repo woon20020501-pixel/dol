@@ -147,4 +147,54 @@ contract MockMoonwellMarketTest is Test {
             "alice has been earning longer than bob"
         );
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // COVERAGE-GAP TESTS (2026-04-17 hardening)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice redeem with zero amount reverts.
+    /// Branch: MockMoonwellMarket.sol:71
+    function test_redeem_zero_reverts() public {
+        vm.prank(alice);
+        market.mint(1000 * ONE_USDC);
+
+        vm.prank(alice);
+        vm.expectRevert(MockMoonwellMarket.ZeroAmount.selector);
+        market.redeem(0);
+    }
+
+    /// @notice redeem exceeding principal reverts with InsufficientBalance.
+    /// Branch: MockMoonwellMarket.sol:76
+    function test_redeem_overBalance_reverts() public {
+        vm.prank(alice);
+        market.mint(100 * ONE_USDC);
+
+        vm.prank(alice);
+        vm.expectRevert(MockMoonwellMarket.InsufficientBalance.selector);
+        market.redeem(200 * ONE_USDC);
+    }
+
+    /// @notice balanceOfUnderlying returns 0 for account with no principal.
+    /// Branch: MockMoonwellMarket.sol:89 (principal == 0 early return)
+    function test_balanceOfUnderlying_zeroPrincipal() public {
+        address neverDeposited = makeAddr("neverDeposited");
+        assertEq(market.balanceOfUnderlying(neverDeposited), 0,
+            "empty account balance is 0");
+    }
+
+    /// @notice principalOf exposes raw principal without interest.
+    /// Protects: observability helper (not in IMoonwellMarket interface).
+    function test_principalOf_nonZero() public {
+        vm.prank(alice);
+        market.mint(1000 * ONE_USDC);
+
+        assertEq(market.principalOf(alice), 1000 * ONE_USDC,
+            "principal equals mint amount pre-accrue");
+    }
+
+    /// @notice exchangeRateStored returns 1e18 constant in the mock.
+    function test_exchangeRateStored_constant() public view {
+        assertEq(market.exchangeRateStored(), 1e18,
+            "mock exchange rate is fixed at 1e18");
+    }
 }

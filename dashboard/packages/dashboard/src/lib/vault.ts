@@ -29,7 +29,7 @@ let _vaultConfig: VaultConfig | null = null;
 let _loaded = false;
 
 /**
- * Parses shared/contracts.json (flat schema from the deploy script):
+ * Parses shared/contracts.json (flat schema from the contracts's deploy script):
  *   { chainId, vault, usdc, abi, deployedAt, deployer, operator, guardian }
  */
 function loadVaultConfig(): VaultConfig | null {

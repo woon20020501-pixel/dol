@@ -11,7 +11,7 @@
 use bot_types::{Dimensionless, LiveInputs, PairId, Usd, Venue};
 
 // ---------------------------------------------------------------------------
-// Slippage constants (Python cost_model.py reference)
+// Slippage constants (spec D.10 / Python cost_model.py)
 // Calibrated conservative defaults; must be re-calibrated from Phase 1 dry-run fills.
 // ---------------------------------------------------------------------------
 const KAPPA: f64 = 0.0008; // √-impact coefficient (Almgren-Chriss class)

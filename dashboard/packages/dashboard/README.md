@@ -1,75 +1,66 @@
-# Pacifica FX Carry Vault — Dashboard
+# packages/dashboard
 
-Single-screen dashboard for the Pacifica FX Carry Vault. Shows real-time
-vault metrics, funding spread charts, position data, and deposit/withdraw
-flows.
+Next.js 14 App Router application. This is the only package in the `dashboard/` pnpm workspace.
 
-## Quick start
+## Running
 
 ```bash
 # From the monorepo root
-cd packages/dashboard
-
-# Copy env and fill in values
-cp .env.example .env.local
-
-# Install dependencies (from monorepo root)
 pnpm install
 
-# Run dev server
-pnpm dev
-```
+# Required env
+cp packages/dashboard/.env.example packages/dashboard/.env.local
+# fill NEXT_PUBLIC_PRIVY_APP_ID (the only required var)
 
-The dashboard runs on **http://localhost:3001** (configured in `package.json`).
+# Dev server
+pnpm --filter dashboard dev
+# http://localhost:3000
+```
 
 ## Environment variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
+| `NEXT_PUBLIC_PRIVY_APP_ID` | Yes | — | Privy app ID for wallet + email + social login |
 | `NEXT_PUBLIC_RPC_URL` | No | `https://sepolia.base.org` | RPC endpoint for on-chain reads |
-| `NEXT_PUBLIC_BOT_API_URL` | No | `http://localhost:7777` | Bot Status API base URL |
-| `NEXT_PUBLIC_DEMO_MODE` | No | `false` | Show deterministic demo data instead of live data |
-| `NEXT_PUBLIC_CHAIN_ID` | No | `84532` | Target chain ID (84532 = Base Sepolia) |
-| `NEXT_PUBLIC_PRIVY_APP_ID` | Yes | — | Privy app ID for wallet/email/social login |
+| `NEXT_PUBLIC_CHAIN_ID` | No | `84532` | Target chain (Base Sepolia) |
+| `NEXT_PUBLIC_DEMO_MODE` | No | `false` | Force the deterministic client simulator; disable tx buttons |
+| `NEXT_PUBLIC_BOT_API_URL` | No | `http://localhost:7777` | Optional bot HTTP surface (`/health`, `/status`, `/events`) |
+| `NAV_JSONL_PATH` | No | monorepo-relative | Path for `/api/nav` reader (overrides the walk-up default) |
+| `SIGNALS_ROOT` | No | monorepo-relative | Same idea for `/api/signal` |
 
-## Pointing at different data sources
+## Data pipeline (`/api/nav`, `/api/signal`)
 
-**Local bot (default):**
-```env
-NEXT_PUBLIC_BOT_API_URL=http://localhost:7777
-```
+Both server routes read files from the sibling `bot-rs` package output directory and expose a JSON HTTP surface the client polls. They have identical structure:
 
-**Remote bot:**
-```env
-NEXT_PUBLIC_BOT_API_URL=https://your-bot-server.example.com
-```
+1. **Tier 1 — live bot output**: walk up three directories from `process.cwd()` (`dol-public/dashboard/packages/dashboard` → `dol-public/`), then read `bot-rs/output/demo_smoke/...`. Returns `source: "live"` and flips `is_stale: true` when the file `mtime` is more than 30 s old.
+2. **Tier 2 — bundled snapshot**: if the live tier fails, read `public/demo/nav.jsonl` (or `public/demo/signals.json`). Returns `source: "snapshot"` and never flags stale (the bundle is intentionally frozen, not a dead bot).
+3. **Tier 3 — simulator**: if both file reads fail, return `{ ok: false, fallback_to_simulator: true }` and the client-side `useAuroraTelemetry` hook switches to a deterministic-ambient SIM mode.
 
-**Demo mode (no bot or contract needed):**
-```env
-NEXT_PUBLIC_DEMO_MODE=true
-```
+### `/api/nav` query parameters
 
-Demo mode renders realistic fake data matching the backtest results from
-PLAN.md. No network requests are made. Deposit/withdraw buttons are
-disabled with a "Demo mode" label.
+- `?since_ms=<ts>` — return only rows with `ts_ms > since`
+- `?tail=<n>` — return only the last `n` rows
 
-## Build
+### `/api/signal`
 
-```bash
-pnpm build   # Production build
-pnpm lint    # ESLint check
-pnpm dev     # Dev server with hot reload
-```
+- `?symbol=<SYM>` — return latest signal JSON for a single symbol
+- No query — return latest per-symbol snapshot across `BTC, ETH, SOL, BNB, ARB, AVAX, SUI, XAU, XAG, PAXG`
 
-## Deploy to Vercel
+## Routes
 
-1. Import the repo in Vercel
-2. Set **Root Directory** to `packages/dashboard`
-3. Set **Framework Preset** to Next.js
-4. Add environment variables (see table above)
-5. Deploy
+| Path | Purpose |
+|---|---|
+| `/` | Landing — product hero, live vault ticker, deposit CTA |
+| `/deposit` | Connect → approve USDC → deposit → receive Dol |
+| `/my-dol` | Holder balance, pending withdraws, cooldown countdown |
+| `/dashboard` | Aurora Console — multi-symbol NAV chart, venue health, NAV reporter status |
+| `/docs/*` | Trust-layer docs (strategy paper, architecture, framework assumptions) |
+| `/faq` | Tabbed FAQ (7 categories, ~28 questions) |
+| `/legal/{terms,privacy,risk}` | Legal pages rendered from `src/content/legal/*.md` |
+| `/unavailable` | Geo-gate fallback (email capture) |
 
-The build command is `next build` and the output directory is `.next`.
+`middleware.ts` gates the entire site: requests from blocked regions (KR, US) are redirected to `/unavailable` before the Next.js handler runs.
 
 ## Yield architecture
 
@@ -98,64 +89,54 @@ V1.5 stacks two yield sources on top of the same TVL:
    └────────┬────────┘             └────────┬────────┘
             │                               │
        funding α                        base APY
-       (~13% × 0.7)                     (~5% × 0.3)
             │                               │
             └──────────────┬────────────────┘
                            ▼
-                     total APY ≈ ~10%
+                     total APY
                   delta-neutral, hedged
 ```
 
-- **Funding alpha** comes from the perp leg only. The vault is short
-  USDJPY on Pacifica (the high-funding venue) and long USDJPY on
-  Lighter (the hedge leg). Net price exposure is ~zero; the vault
-  collects the funding rate spread.
-- **Treasury yield** is the conservative base layer. 30% of TVL is
-  supplied to a Moonwell-style permissionless lending market for a
-  steady ~5% APY, which routes to real Moonwell on V2 mainnet.
-- **Total APY** is the share-weighted sum of the two layers, surfaced
-  in the hero strip and broken down in the "Yield Sources" panel.
+- **Funding alpha** from the perp leg only. Same symbol, opposite sides on two venues; funding-rate spread is the only revenue source. Net price exposure ≈ 0.
+- **Treasury yield** is the conservative base layer. 30% of TVL is supplied to a Moonwell-style permissionless lending market.
+- **Total APY** is the share-weighted sum. The landing hero and the "Yield Sources" panel break it down.
 
-The dashboard reads the live allocation from the vault config
-(`shared/contracts.json` → `allocation.{treasuryBps,marginBps}`) and
-the live treasury balance from the configured `treasuryVault` address
-when present. If those fields are missing it falls back to a 70/30
-synthetic split so the UI is still demo-ready pre-deploy.
+Live allocation is read from the vault config (`shared/contracts.json` → `allocation.{treasuryBps,marginBps}`) and the live treasury balance from the configured `treasuryVault` address. If those fields are missing the UI falls back to a 70/30 synthetic split.
 
-### NAV reporter
+## NAV reporter card
 
-Vault NAV is not implicitly trusted from on-chain reads alone — perp
-positions live off-chain (Pacifica, Lighter), so somebody has to mark
-the vault to market. That somebody is the **NAV reporter**: an
-off-chain process owned by the operator that, every ~5 minutes,
-fetches every leg's mark, computes the total NAV, and submits it
-on-chain via `vault.reportNAV(value)` signed by the operator key.
+Vault NAV is not implicit from on-chain reads — perp positions live off-chain. The NAV reporter is an operator-run process that every ~5 minutes fetches every leg's mark, computes total NAV, and submits it on-chain via `vault.reportNAV(value, signature)`. The vault contract enforces a **±10% sanity guard** at write time.
 
-The vault contract enforces a **±10% sanity guard** at write time:
-any reported NAV that drifts more than 10% from the previous reported
-value is rejected. This caps how badly a compromised or malfunctioning
-operator can mark the vault per tick, while still letting honest
-updates through.
-
-The dashboard surfaces all of this in the **NAV Reporter** card in the
-right sidebar: operator address (with copy), last report relative
-time, last reported NAV in USD, last tx hash (linked to BaseScan),
-and a live countdown to the next scheduled report. A status pill in
-the card header (live / dry-run / error / idle) tells the user at a
-glance whether their funds are being honestly priced right now, and
-the page header surfaces a colored hint if the reporter is erroring
-or has not yet posted an initial report.
+The dashboard surfaces this as the NAV Reporter card in the right sidebar: operator address, last report relative time, last NAV in USD, last tx hash (linked to BaseScan), live countdown to the next scheduled report, and a status pill (live / dry-run / error / idle) in the card header. A colored hint appears in the page header if the reporter is erroring or has not yet posted.
 
 ## Architecture
 
-- **Next.js 14** (App Router) + TypeScript strict
-- **shadcn/ui** + Tailwind for components and styling
-- **Wagmi v2** + Viem for on-chain reads/writes via Privy wallets
-- **Recharts** for funding spread and cumulative PnL charts
-- **React Query** (via Wagmi) for data fetching with polling
+- **Next.js 14** App Router + TypeScript strict
+- **shadcn/ui** + Tailwind CSS with utility classes
+- **wagmi v2** + viem for typed on-chain reads and writes
+- **Privy** for wallet auth (email / Google / external wallet)
+- **Recharts** for time-series charts (NAV, funding spread, cumulative PnL)
+- **React Query** (via wagmi) for data fetching with polling
 
-Data flows:
-- On-chain: vault contract reads via wagmi (`totalAssets`, `sharePrice`, `balanceOf`)
-- Off-chain: Bot Status API at `/health`, `/status`, `/events`
-- Contract config: `shared/contracts.json` (written by the contracts layer at deploy time)
-- Fallback: deterministic demo data when bot/contract unavailable
+## Testing
+
+Vitest tests exist in-tree:
+
+```
+src/lib/{format,env,errors,txState,constants}.test.ts
+src/hooks/{useDeposit,useVaultReads}.test.ts
+```
+
+The test runner is not wired into `package.json` in this repo. Run manually:
+
+```bash
+npx vitest run --root packages/dashboard
+```
+
+## Build + deploy
+
+```bash
+pnpm --filter dashboard build     # Production build
+pnpm --filter dashboard lint      # ESLint
+```
+
+Deploy to Vercel: set **Root Directory** to `packages/dashboard`, **Framework** to Next.js, and add the env vars listed above. The build emits `.next/`.

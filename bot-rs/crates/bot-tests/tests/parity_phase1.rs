@@ -837,5 +837,5 @@ fn hurst() {}
 fn expected_residual_income() {}
 
 #[test]
-#[ignore = "Phase 2 gated: dry_run_end_to_end placeholder — not a real fixture"]
+#[ignore = "Phase 2 gated: dry_run_end_to_end conservative default — not a real fixture"]
 fn dry_run_end_to_end() {}

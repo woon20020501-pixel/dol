@@ -36,7 +36,7 @@ const SYNTHETIC_DEPTH_OFFSETS_BPS: [f64; 5] = [1.0, 2.0, 5.0, 10.0, 20.0];
 /// Demo symbol list returned by `list_symbols` when the venue API doesn't
 /// expose a symbol directory endpoint.
 ///
-/// Universe composition: 7 crypto + 3 RWA.
+/// RWA swap (2026-04-15): 7 crypto + 3 RWA.
 /// - Removed `OP`, `MATIC`, `APT` — not listed on Pacifica.
 /// - Added `XAU`, `XAG`, `PAXG` — Dol's core RWA yield symbols.
 /// - XAU/XAG hedge via trade.xyz (HIP-3 on Hyperliquid infrastructure)
@@ -89,7 +89,7 @@ impl VenueAdapter for PacificaReadOnlyAdapter {
             self.rest.get_funding(symbol),
             self.rest.get_orderbook(symbol),
         )
-        .map_err(|e| AdapterError::Network(e.to_string()))?;
+        .map_err(map_pacifica_error)?;
 
         // ── Timestamp ─────────────────────────────────────────────────────
         let ts_ms = if book_res.timestamp > 0 {
@@ -246,5 +246,74 @@ impl VenueAdapter for PacificaReadOnlyAdapter {
             ts_ms,
             dry_run: true,
         })
+    }
+}
+
+/// Convert an anyhow::Error from `bot-venues::pacifica::rest` into an
+/// [`AdapterError`], mapping HTTP 429 (tagged with the
+/// `RATE_LIMIT_SENTINEL`) to `AdapterError::RateLimited`.
+fn map_pacifica_error(e: anyhow::Error) -> AdapterError {
+    let msg = format!("{:#}", e);
+    // Look for the sentinel anywhere in the chained error Display —
+    // anyhow composes `context`s so the top of the chain may be the
+    // endpoint name and the root cause carries the sentinel.
+    if let Some(start) = msg.find(bot_venues::pacifica::rest::RATE_LIMIT_SENTINEL) {
+        let payload = &msg[start + bot_venues::pacifica::rest::RATE_LIMIT_SENTINEL.len()..];
+        // Strip trailing context noise (everything after the first ": " or newline).
+        let raw_header = payload.split(['\n', ':']).next().unwrap_or("").trim();
+        let retry_after_secs = crate::rate_limit::parse_retry_after(
+            if raw_header.is_empty() {
+                None
+            } else {
+                Some(raw_header)
+            },
+            chrono::Utc::now(),
+        );
+        return AdapterError::RateLimited { retry_after_secs };
+    }
+    AdapterError::Network(msg)
+}
+
+#[cfg(test)]
+mod rate_limit_map_tests {
+    use super::*;
+
+    #[test]
+    fn maps_sentinel_to_rate_limited_with_retry_after() {
+        let e = anyhow::anyhow!(
+            "pacifica REST /book: {}{}",
+            bot_venues::pacifica::rest::RATE_LIMIT_SENTINEL,
+            "7"
+        );
+        let ae = map_pacifica_error(e);
+        match ae {
+            AdapterError::RateLimited { retry_after_secs } => {
+                assert_eq!(retry_after_secs, 7);
+            }
+            other => panic!("expected RateLimited, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn maps_sentinel_without_retry_after_to_default() {
+        let e = anyhow::anyhow!(
+            "pacifica REST /account: {}",
+            bot_venues::pacifica::rest::RATE_LIMIT_SENTINEL
+        );
+        let ae = map_pacifica_error(e);
+        match ae {
+            AdapterError::RateLimited { retry_after_secs } => {
+                // DEFAULT_BACKOFF_SECS from rate_limit.rs
+                assert_eq!(retry_after_secs, crate::rate_limit::DEFAULT_BACKOFF_SECS);
+            }
+            other => panic!("expected RateLimited, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn non_rate_limit_error_falls_through_to_network() {
+        let e = anyhow::anyhow!("random network failure");
+        let ae = map_pacifica_error(e);
+        assert!(matches!(ae, AdapterError::Network(_)));
     }
 }

@@ -14,7 +14,7 @@
 /// Uses `f64::exp_m1` (libm `expm1`) for numerical stability. For |x| < 1e-8
 /// falls back to a 4-term Taylor expansion. Matches Python `phi_reference`.
 ///
-/// Boundary values:
+/// Boundary values (sanity):
 ///   φ(0)   = 1
 ///   φ(1)   ≈ 0.6321205588
 ///   φ(10)  ≈ 0.09999546
@@ -53,7 +53,7 @@ mod tests {
     use super::*;
 
     // -----------------------------------------------------------------------
-    // Boundary-value sanity tests
+    // Boundary-value sanity tests (spec §D.1)
     // -----------------------------------------------------------------------
 
     #[test]
@@ -66,7 +66,7 @@ mod tests {
         // (1 - e^-1) / 1 = 1 - 1/e
         let expected = 1.0 - (-1.0_f64).exp();
         assert!((phi(1.0) - expected).abs() < 1e-15);
-        // Spec documented value
+        // documented value
         assert!((phi(1.0) - 0.6321205588).abs() < 1e-8);
     }
 

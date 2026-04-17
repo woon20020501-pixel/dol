@@ -18,6 +18,13 @@ thiserror    = { workspace = true }
 tracing      = { workspace = true }
 reqwest      = { workspace = true }
 chrono       = { workspace = true }
+anyhow       = { workspace = true }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand         = "0.8"
+uuid         = { version = "1", features = ["v4"] }
+bs58         = "0.5"
+zeroize      = { version = "1", features = ["zeroize_derive"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["full", "test-util"] }
+tokio         = { workspace = true, features = ["full", "test-util"] }
+futures-util  = { workspace = true }

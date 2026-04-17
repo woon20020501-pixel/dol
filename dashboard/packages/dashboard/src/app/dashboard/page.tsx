@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { HeroStats, type HeroData } from "@/components/hero/HeroStats";
 import { DepositCard } from "@/components/vault/DepositCard";
 import { WithdrawCard } from "@/components/vault/WithdrawCard";
@@ -7,12 +8,11 @@ import { NavReporterCard } from "@/components/vault/NavReporterCard";
 import { OfflineBanner } from "@/components/common/OfflineBanner";
 import { ConnectButton } from "@/components/hero/ConnectButton";
 import { ContractBanner } from "@/components/common/ContractBanner";
+import { VaultErrorBanner } from "@/components/common/VaultErrorBanner";
 import { useVaultReads } from "@/hooks/useVaultReads";
 import { useBotStatus } from "@/hooks/useBotStatus";
 import { useBotHealth } from "@/hooks/useBotHealth";
 import { useNavReporter } from "@/hooks/useNavReporter";
-import { AuroraConsole } from "@/components/aurora/AuroraConsole";
-import { MultiSymbolNavPanel } from "@/components/aurora/MultiSymbolNavPanel";
 import {
   AURORA_CONSTANTS,
   SYMBOL_UNIVERSE,
@@ -20,7 +20,49 @@ import {
   useAuroraTelemetry,
 } from "@/hooks/useAuroraTelemetry";
 
-// Mandate constants from v3.5.2 dry run.
+// Dynamic-import the two heaviest Recharts consumers. Each pulls
+// Recharts (≈50 kB min+gz) plus 600+ lines of chart rendering code.
+// The hero row + vault cards render instantly; the charts hydrate
+// shortly after via a skeleton. Net effect: dashboard LCP/TTI move
+// off the charts' critical path, improving Lighthouse perf score
+// without changing the visual order.
+//
+// ssr:false is deliberate — these components read window/Recharts
+// internals that fail under Node SSR. The sibling <AuroraConsole>
+// fallback used to produce hydration warnings; the skeleton avoids
+// the flash by reserving equivalent vertical space.
+const AuroraConsole = dynamic(
+  () =>
+    import("@/components/aurora/AuroraConsole").then((m) => ({
+      default: m.AuroraConsole,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        aria-hidden="true"
+        className="mb-4 h-[480px] rounded-2xl border border-dark-border bg-dark-surface/40 animate-pulse"
+      />
+    ),
+  },
+);
+const MultiSymbolNavPanel = dynamic(
+  () =>
+    import("@/components/aurora/MultiSymbolNavPanel").then((m) => ({
+      default: m.MultiSymbolNavPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        aria-hidden="true"
+        className="h-[520px] rounded-2xl border border-dark-border bg-dark-surface/40 animate-pulse"
+      />
+    ),
+  },
+);
+
+// Mandate constants from  / research v3.5.2 dry run.
 // v3.5.2 production: gross 14.20% APY → customer 8.00% (capped),
 // buffer 4.78%, reserve 1.42%. Treat 8/14.2 ≈ 0.5634 as the
 // "customer share of gross before the cap kicks in".
@@ -189,6 +231,15 @@ function DashboardBody() {
 
         {/* Contract not deployed banner */}
         <ContractBanner deployed={vault.deployed} />
+
+        {/* Vault read failure (RPC hiccup, wrong chain). Auto-retries
+            via wagmi's 10s refetchInterval; manual retry button is a
+            user-visible "I did something" affordance. */}
+        <VaultErrorBanner
+          isError={vault.isError}
+          error={vault.error}
+          onRetry={vault.refetch}
+        />
 
         {/* Offline banner */}
         {botHealth.isOffline && (

@@ -13,7 +13,7 @@ export function ContractBanner({ deployed }: { deployed: boolean }) {
       <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span>
         Contract not deployed yet. Showing demo data. Vault reads will
-        activate automatically once the contracts are deployed.
+        activate automatically once the contracts deploys.
       </span>
     </div>
   );

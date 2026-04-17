@@ -19,6 +19,12 @@ import {
 } from "@/lib/guards";
 import { emitDolTxConfirmed } from "@/lib/txEvents";
 import { log } from "@/lib/logger";
+import {
+  pickRevertedHash,
+  anyReverted,
+  mergeTxError,
+  isRevertError,
+} from "@/lib/txState";
 
 /**
  * useDolWithdraw — withdraw flow targeting pBondSenior (not the underlying
@@ -204,11 +210,21 @@ export function useDolWithdraw() {
     reset: resetRequest,
   } = useWriteContract();
 
-  const { data: requestReceipt, isLoading: isRequestConfirming, isSuccess: isRequestConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: requestHash,
-      chainId: TARGET_CHAIN_ID,
-    });
+  // See useDeposit for why hasReceiptError is gated through
+  // isRevertError to derive the narrower "actually reverted on-chain"
+  // signal. RPC hiccups must not be mislabelled as contract reverts.
+  const {
+    data: requestReceipt,
+    isLoading: isRequestConfirming,
+    isSuccess: isRequestConfirmed,
+    isError: hasRequestReceiptError,
+    error: requestReceiptError,
+  } = useWaitForTransactionReceipt({
+    hash: requestHash,
+    chainId: TARGET_CHAIN_ID,
+  });
+  const isRequestReverted =
+    hasRequestReceiptError && isRevertError(requestReceiptError);
 
   // Parse RedeemRequested event from the receipt and persist the id.
   // Dol contract event signature:
@@ -357,11 +373,17 @@ export function useDolWithdraw() {
     reset: resetClaim,
   } = useWriteContract();
 
-  const { isLoading: isClaimConfirming, isSuccess: isClaimConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: claimHash,
-      chainId: TARGET_CHAIN_ID,
-    });
+  const {
+    isLoading: isClaimConfirming,
+    isSuccess: isClaimConfirmed,
+    isError: hasClaimReceiptError,
+    error: claimReceiptError,
+  } = useWaitForTransactionReceipt({
+    hash: claimHash,
+    chainId: TARGET_CHAIN_ID,
+  });
+  const isClaimReverted =
+    hasClaimReceiptError && isRevertError(claimReceiptError);
 
   useEffect(() => {
     if (!isClaimConfirmed || !claimingId || !userAddress) return;
@@ -403,11 +425,17 @@ export function useDolWithdraw() {
     reset: resetInstant,
   } = useWriteContract();
 
-  const { isLoading: isInstantConfirming, isSuccess: isInstantConfirmed } =
-    useWaitForTransactionReceipt({
-      hash: instantHash,
-      chainId: TARGET_CHAIN_ID,
-    });
+  const {
+    isLoading: isInstantConfirming,
+    isSuccess: isInstantConfirmed,
+    isError: hasInstantReceiptError,
+    error: instantReceiptError,
+  } = useWaitForTransactionReceipt({
+    hash: instantHash,
+    chainId: TARGET_CHAIN_ID,
+  });
+  const isInstantReverted =
+    hasInstantReceiptError && isRevertError(instantReceiptError);
 
   useEffect(() => {
     if (isInstantConfirmed) {
@@ -511,6 +539,26 @@ export function useDolWithdraw() {
     setClaimingId(null);
   }, [resetRequest, resetClaim, resetInstant]);
 
+  // Merge writeContract errors (wallet rejection, gas estimate fail)
+  // with receipt errors (on-chain revert — wagmi core 2.22.1 throws
+  // from waitForTransactionReceipt when status === 'reverted'). We
+  // keep the raw Error so consumers can run translateError() and
+  // branch on UserError.category (user_rejected, revert, network).
+  const mergedRequestError = mergeTxError(requestError, requestReceiptError);
+  const mergedClaimError = mergeTxError(claimError, claimReceiptError);
+  const mergedInstantError = mergeTxError(instantError, instantReceiptError);
+
+  // Revert-specific fields so the UI can render a basescan link
+  // alongside the error. Only one flow can be reverted at a time in
+  // practice (they share disabled button states in the UI).
+  const revertFlows = [
+    { isReverted: isRequestReverted, hash: requestHash },
+    { isReverted: isClaimReverted, hash: claimHash },
+    { isReverted: isInstantReverted, hash: instantHash },
+  ];
+  const revertedHash = pickRevertedHash(revertFlows);
+  const isReverted = anyReverted(revertFlows);
+
   return {
     // State
     isConnected,
@@ -518,14 +566,14 @@ export function useDolWithdraw() {
     // Request redeem (scheduled)
     isRequesting: isRequestPending || isRequestConfirming,
     isRequestConfirmed,
-    requestError,
+    requestError: mergedRequestError,
     requestRedeem,
     requestHash,
     // Claim redeem
     isClaiming: isClaimPending || isClaimConfirming,
     isClaimConfirmed,
     claimingId,
-    claimError,
+    claimError: mergedClaimError,
     claimRedeem,
     claimHash,
     isClaimable,
@@ -533,9 +581,12 @@ export function useDolWithdraw() {
     // Instant redeem (Plan A)
     isInstantPending: isInstantPending || isInstantConfirming,
     isInstantConfirmed,
-    instantError,
+    instantError: mergedInstantError,
     instantRedeem,
     instantHash,
+    // Reverted-tx aggregate — consumer shows basescan link when set.
+    isReverted,
+    revertedHash,
     // Pending
     pending,
     // Util

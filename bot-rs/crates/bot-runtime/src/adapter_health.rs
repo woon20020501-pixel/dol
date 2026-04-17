@@ -1,15 +1,16 @@
-//! Per-symbol adapter health telemetry.
+//! Per-symbol adapter health telemetry —  response.
 //!
 //! Tracks the "drops-and-continues" failure behavior of the tick engine so
-//! the dashboard can render a yellow/red warning glyph on symbols
+//! the dashboard's dashboard can render a yellow/red warning glyph on symbols
 //! whose Pacifica `/book` endpoint has been flaky. Does NOT implement the
-//! retry-and-degrade policy; the current `run_one_tick` already drops
-//! the failing venue and proceeds with the others, so demo safety is
-//! preserved. This module only adds the counter rollup.
+//! retry-and-degrade policy from ;  the current
+//! `run_one_tick` already drops the failing venue and proceeds with the
+//! others, so demo safety is preserved. This module only adds the
+//! counter rollup the spec requested.
 //!
-//! If the policy ever needs to escalate to the full retry-and-degrade
-//! path, extend `SymbolHealth` with `cooldown_remaining` /
-//! `is_degraded_streak` fields and add a `tick_with_policy` method.
+//! If the policy ever needs to escalate to (b) — the full retry-and-
+//! degrade path — extend `SymbolHealth` with `cooldown_remaining`
+//! / `is_degraded_streak` fields and add a `tick_with_policy` method.
 //! The current struct shape is forward-compatible with that upgrade.
 
 use std::collections::BTreeMap;
@@ -28,10 +29,10 @@ pub struct SymbolHealth {
     /// Consecutive ticks ending in at least one venue-fetch failure.
     /// Resets to 0 on a tick where every venue fetch succeeded.
     pub consecutive_failures: u32,
-    /// True iff `consecutive_failures >= DEGRADATION_THRESHOLD`. The
+    /// True iff `consecutive_failures >= DEGRADATION_THRESHOLD`. the dashboard's
     /// dashboard renders a red dot when this is true. Note: demo mode does
     /// NOT exclude the symbol from the decision loop when degraded — that
-    /// is the (b) retry-and-degrade policy which we have not implemented.
+    /// is the (b) policy in  which we have not implemented.
     /// The flag is advisory telemetry only in v0.
     pub is_degraded: bool,
     /// Last venue that failed to fetch for this symbol, as a readable
@@ -41,12 +42,13 @@ pub struct SymbolHealth {
 }
 
 /// Consecutive-failure threshold that flips `is_degraded = true`.
+/// Matches  step 5.
 pub const DEGRADATION_THRESHOLD: u32 = 3;
 
 /// Registry of per-symbol adapter health, keyed by symbol string.
 ///
 /// The caller (tick loop) updates the registry each tick via
-/// [`record_tick`]. The signal emitter reads via [`health_for`].
+/// [`AdapterHealthRegistry::record_tick`]. The signal emitter reads via [`AdapterHealthRegistry::health_for`].
 #[derive(Debug, Default)]
 pub struct AdapterHealthRegistry {
     by_symbol: BTreeMap<String, SymbolHealth>,

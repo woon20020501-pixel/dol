@@ -32,7 +32,9 @@ contract PacificaCarryVaultFuzzTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0,
+            0
         );
 
         // Fund alice generously for fuzz tests
@@ -228,7 +230,7 @@ contract PacificaCarryVaultFuzzTest is Test {
         uint256 requestId = vault.requestWithdraw(shares);
         vm.stopPrank();
 
-        (, , uint256 unlockTimestamp, ) = vault.withdrawRequests(requestId);
+        (, , , uint256 unlockTimestamp, ) = vault.withdrawRequests(requestId);
 
         // Warp to a random offset from now
         uint256 targetTime = block.timestamp + timeOffset;
@@ -268,7 +270,7 @@ contract PacificaCarryVaultFuzzTest is Test {
         uint256 requestId = vault.requestWithdraw(shares);
         vm.stopPrank();
 
-        (, , uint256 unlockTimestamp, ) = vault.withdrawRequests(requestId);
+        (, , , uint256 unlockTimestamp, ) = vault.withdrawRequests(requestId);
 
         // Warp to exactly the unlock timestamp
         vm.warp(unlockTimestamp);

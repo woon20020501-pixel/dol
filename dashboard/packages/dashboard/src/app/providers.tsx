@@ -4,10 +4,16 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { WagmiProvider } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig, baseSepolia } from "@/lib/wagmi";
+import { env } from "@/lib/env";
 
 const queryClient = new QueryClient();
 
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
+// env is zod-parsed at module load; if the schema rejects (bad URL,
+// unknown enum value), the app throws on boot instead of silently
+// running with garbage values. Empty PRIVY_APP_ID is permitted so
+// local dev without .env.local still renders the public routes —
+// auth just shows the connect-prompt state.
+const PRIVY_APP_ID = env.NEXT_PUBLIC_PRIVY_APP_ID;
 
 if (!PRIVY_APP_ID && typeof window !== "undefined") {
   console.warn(

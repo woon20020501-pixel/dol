@@ -4,5 +4,7 @@
 //! Week 1 addition: `funding_cycle_lock` — the iron law §1 gate (Wall 1).
 //! No I/O, no async, no external runtime dependencies.
 
+pub mod fsm_controller;
 pub mod funding_cycle_lock;
+pub mod lock_typestate;
 pub mod stochastic;

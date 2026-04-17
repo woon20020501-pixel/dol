@@ -6,6 +6,28 @@ use reqwest::Client;
 use super::types::*;
 use crate::venue::{Balance, FundingRate, OrderbookLevel, OrderbookTop, Position, PositionSide};
 
+/// Sentinel prefix used to tag rate-limit errors so the bot-adapters layer
+/// can pattern-match on the error message and emit
+/// `AdapterError::RateLimited`. Format: `RATE_LIMITED_429:<retry_after_raw>`.
+pub const RATE_LIMIT_SENTINEL: &str = "RATE_LIMITED_429:";
+
+/// Inspect a `reqwest::Response`. If status is 429, emit an `anyhow::Error`
+/// whose `Display` starts with [`RATE_LIMIT_SENTINEL`] followed by the raw
+/// `Retry-After` header (or empty string if missing). Per RFC 7231 §7.1.3
+/// the adapter will parse that payload via `bot_adapters::rate_limit`.
+async fn rate_limit_check(resp: reqwest::Response) -> Result<reqwest::Response> {
+    if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        let ra = resp
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        anyhow::bail!("{}{}", RATE_LIMIT_SENTINEL, ra);
+    }
+    Ok(resp)
+}
+
 pub struct PacificaRest {
     client: Client,
     base_url: String,
@@ -29,15 +51,15 @@ impl PacificaRest {
 
     pub async fn get_balance(&self) -> Result<Balance> {
         let url = format!("{}/account?account={}", self.base_url, self.account);
-        let resp: ApiResponse<AccountData> = self
+        let resp = self
             .client
             .get(&url)
             .send()
             .await
-            .context("pacifica REST /account")?
-            .json()
-            .await
-            .context("pacifica REST /account json")?;
+            .context("pacifica REST /account")?;
+        let resp = rate_limit_check(resp).await?;
+        let resp: ApiResponse<AccountData> =
+            resp.json().await.context("pacifica REST /account json")?;
 
         if !resp.success {
             anyhow::bail!(
@@ -57,15 +79,15 @@ impl PacificaRest {
 
     pub async fn get_position(&self, symbol: &str) -> Result<Option<Position>> {
         let url = format!("{}/positions?account={}", self.base_url, self.account);
-        let resp: ApiResponse<Vec<PositionItem>> = self
+        let resp = self
             .client
             .get(&url)
             .send()
             .await
-            .context("pacifica REST /positions")?
-            .json()
-            .await
-            .context("pacifica REST /positions json")?;
+            .context("pacifica REST /positions")?;
+        let resp = rate_limit_check(resp).await?;
+        let resp: ApiResponse<Vec<PositionItem>> =
+            resp.json().await.context("pacifica REST /positions json")?;
 
         if !resp.success {
             anyhow::bail!(
@@ -100,12 +122,14 @@ impl PacificaRest {
 
     pub async fn get_funding(&self, symbol: &str) -> Result<FundingRate> {
         let url = format!("{}/info/prices", self.base_url);
-        let resp: ApiResponse<Vec<PriceInfo>> = self
+        let resp = self
             .client
             .get(&url)
             .send()
             .await
-            .context("pacifica REST /info/prices")?
+            .context("pacifica REST /info/prices")?;
+        let resp = rate_limit_check(resp).await?;
+        let resp: ApiResponse<Vec<PriceInfo>> = resp
             .json()
             .await
             .context("pacifica REST /info/prices json")?;
@@ -128,15 +152,14 @@ impl PacificaRest {
 
     pub async fn get_orderbook(&self, symbol: &str) -> Result<OrderbookTop> {
         let url = format!("{}/book?symbol={}", self.base_url, symbol);
-        let resp: ApiResponse<BookData> = self
+        let resp = self
             .client
             .get(&url)
             .send()
             .await
-            .context("pacifica REST /book")?
-            .json()
-            .await
-            .context("pacifica REST /book json")?;
+            .context("pacifica REST /book")?;
+        let resp = rate_limit_check(resp).await?;
+        let resp: ApiResponse<BookData> = resp.json().await.context("pacifica REST /book json")?;
 
         if !resp.success {
             anyhow::bail!("pacifica /book failed: {}", resp.error.unwrap_or_default());

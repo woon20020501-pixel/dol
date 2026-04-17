@@ -89,11 +89,7 @@ contract Dol is ERC20, ReentrancyGuard {
     /// @param _vault Address of the PacificaCarryVault
     /// @param _usdc Address of the USDC token
     /// @param _guardian Address that can set Junior and trigger distribution
-    constructor(
-        PacificaCarryVault _vault,
-        IERC20 _usdc,
-        address _guardian
-    ) ERC20("Dol", "DOL") {
+    constructor(PacificaCarryVault _vault, IERC20 _usdc, address _guardian) ERC20("Dol", "DOL") {
         vault = _vault;
         usdc = _usdc;
         guardian = _guardian;
@@ -142,11 +138,7 @@ contract Dol is ERC20, ReentrancyGuard {
 
         uint256 vaultRequestId = vault.requestWithdraw(vaultShares);
         redeemId = nextRedeemId++;
-        redeemRequests[redeemId] = RedeemRequest({
-            user: msg.sender,
-            vaultRequestId: vaultRequestId,
-            claimed: false
-        });
+        redeemRequests[redeemId] = RedeemRequest({user: msg.sender, vaultRequestId: vaultRequestId, claimed: false});
         emit RedeemRequested(msg.sender, dolAmount, redeemId);
     }
 
@@ -208,8 +200,7 @@ contract Dol is ERC20, ReentrancyGuard {
         if (seniorVaultShares == 0) return;
         uint256 seniorValue = vault.convertToAssets(seniorVaultShares);
 
-        uint256 seniorYield = (totalDeposited * SENIOR_TARGET_APY_BPS * elapsed)
-            / (BPS_DENOMINATOR * 365 days);
+        uint256 seniorYield = (totalDeposited * SENIOR_TARGET_APY_BPS * elapsed) / (BPS_DENOMINATOR * 365 days);
         uint256 seniorTarget = totalDeposited + seniorYield;
 
         if (seniorValue > seniorTarget) {
@@ -226,6 +217,12 @@ contract Dol is ERC20, ReentrancyGuard {
                 uint256 juniorValue = vault.convertToAssets(juniorVaultShares);
                 uint256 coverValue = deficit < juniorValue ? deficit : juniorValue;
                 uint256 coverShares = vault.convertToShares(coverValue);
+                // Defensive cap: coverShares ≤ juniorVaultShares holds by
+                // construction of convertToShares/convertToAssets (both floor-
+                // round), so this branch is mathematically unreachable in normal
+                // operation. Retained as belt-and-suspenders against future
+                // rounding-convention changes in the OZ ERC4626 base.
+                // slither-disable-next-line dead-code
                 if (coverShares > juniorVaultShares) coverShares = juniorVaultShares;
                 if (coverShares > 0) {
                     IPBondJunior(juniorContract).absorbLoss(coverShares);
@@ -257,9 +254,7 @@ contract Dol is ERC20, ReentrancyGuard {
     function pricePerShare() external view returns (uint256) {
         uint256 supply = totalSupply();
         if (supply == 0) return 1e6;
-        uint256 value = vault.convertToAssets(
-            IERC20(address(vault)).balanceOf(address(this))
-        );
+        uint256 value = vault.convertToAssets(IERC20(address(vault)).balanceOf(address(this)));
         return (value * 1e6) / supply;
     }
 }

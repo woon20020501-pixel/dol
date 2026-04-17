@@ -26,7 +26,7 @@ enum Commands {
 async fn main() -> Result<()> {
     // Preflight: if RUNNER_ALLOW_LIVE=1 is set, verify v0 components are
     // wired before starting any subcommand. Otherwise (demo mode) pass
-    // silently. See `bot_runtime::live_gate` + docs/v0-punchlist.md.
+    // silently. See `bot_runtime::live_gate` + the spec.
     if let Err(msg) = bot_runtime::live_gate::preflight_live_gate() {
         eprintln!("preflight failed: {msg}");
         std::process::exit(2);

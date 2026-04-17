@@ -23,7 +23,10 @@ use crate::adapter_health::{AdapterHealthRegistry, SymbolHealth};
 use crate::cycle_lock::{CycleLockRegistry, EnforceOutcome};
 use crate::decision::{self, PairDecision};
 use crate::fair_value::{self, FairValue};
+use crate::history::FundingHistoryRegistry;
 use crate::nav::NavTracker;
+use crate::risk::{self, RiskDecision, RiskStack};
+use crate::scoring::{self, ForecastScore, ForecastVerdict, ScoringInputs};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core output types
@@ -52,10 +55,21 @@ pub struct TickOutput {
     pub cycle_lock: CycleLockInfo,
     /// Adapter health snapshot for this symbol AFTER this tick's fetch
     /// attempts were recorded. Rolled up into signal JSON diagnostics so
-    /// the dashboard can flag flaky symbols.
+    /// the dashboard's dashboard can flag flaky symbols. 
     pub adapter_health: SymbolHealth,
     /// NAV after applying the decision accrual.
     pub nav_after: f64,
+    /// Composite decision from the 6-guard runtime risk stack. Determines
+    /// whether the effective decision was passed, reduced, blocked, or
+    /// triggered a flatten. Fed into signal JSON `risk_stack` payload.
+    pub risk_decision: RiskDecision,
+    /// Size multiplier applied to the effective decision's notional
+    /// (1.0 = pass, 0.0 = block/flatten, ∈ (0, 1) = proportional reduce).
+    pub risk_size_multiplier: f64,
+    /// Forecast score — regime classification + OU fit + break-even hold +
+    /// Bernstein leverage bound + expected residual income. Feeds signal JSON
+    /// `forecast_scoring` section (no longer stubbed once this is populated).
+    pub forecast: ForecastScore,
 }
 
 /// Compact cycle-lock telemetry for the tick output and signal JSON.
@@ -163,36 +177,54 @@ impl TickEngine {
     ///
     /// Signal JSON is NOT written here — the caller writes it BEFORE any
     /// adapter submission (integration-spec §5.3 ordering rule).
+    ///
+    /// The 9 arguments are all independent sub-registries that must be
+    /// passed in by the caller (each corresponds to a distinct Priority
+    /// deliverable: NAV, cycle-lock, adapter health, risk stack, funding
+    /// history, plus the scalar time inputs). Bundling into a struct would
+    /// just rename the 9 fields and not reduce the actual dependency count.
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_one_tick(
         &self,
         symbol: &str,
         nav_tracker: &mut NavTracker,
         cycle_lock_registry: &mut CycleLockRegistry,
         adapter_health: &mut AdapterHealthRegistry,
+        risk_stack: &mut RiskStack,
+        history: &mut FundingHistoryRegistry,
         now_ms: i64,     // simulated Unix milliseconds (from SimulatedClock::now_ms())
         dt_seconds: f64, // simulated elapsed seconds since last tick
     ) -> anyhow::Result<TickOutput> {
         let ts_ms = now_ms;
         let now_s = now_ms as f64 / 1000.0;
+        let now_instant = std::time::Instant::now();
 
-        // ── Step 1: Parallel fetch ────────────────────────────────────────
+        // ── Step 1: Parallel fetch with per-adapter latency timing ────────
         let mut fetch_futures = Vec::with_capacity(self.adapters.len());
         for (venue, adapter) in &self.adapters {
             let symbol_owned = symbol.to_string();
             let venue = *venue;
             let adapter = Arc::clone(adapter);
             fetch_futures.push(async move {
+                let t_start = std::time::Instant::now();
                 let result = adapter.fetch_snapshot(&symbol_owned).await;
-                (venue, result)
+                let latency = t_start.elapsed();
+                (venue, result, latency)
             });
         }
 
         let results = futures_util::future::join_all(fetch_futures).await;
 
-        // ── Step 2: Drop errors, collect snapshots, record health ────────
+        // ── Step 2: Drop errors, collect snapshots, record health + latency ─
         let mut snapshots: Vec<VenueSnapshot> = Vec::new();
         let mut failure_reasons: Vec<(Venue, String)> = Vec::new();
-        for (venue, result) in results {
+        for (venue, result, latency) in results {
+            // Feed latency to the Pacifica watchdog (per I-PAC-WATCH spec —
+            // the guard only monitors Pacifica; other venues' latency is
+            // recorded but not gated on).
+            if venue == Venue::Pacifica {
+                risk_stack.on_api_latency(now_instant, latency);
+            }
             match result {
                 Ok(snap) => {
                     info!(
@@ -200,6 +232,7 @@ impl TickEngine {
                         symbol = %symbol,
                         mid_price = snap.mid_price,
                         funding_annual = snap.funding_rate_annual.0,
+                        latency_ms = latency.as_millis(),
                         "snapshot fetched"
                     );
                     snapshots.push(snap);
@@ -210,6 +243,7 @@ impl TickEngine {
                         venue = ?venue,
                         symbol = %symbol,
                         error = %reason,
+                        latency_ms = latency.as_millis(),
                         "adapter fetch failed — skipping venue this tick"
                     );
                     failure_reasons.push((venue, reason));
@@ -233,6 +267,13 @@ impl TickEngine {
             );
         }
 
+        // Record this tick's venue observations into history (for OU/ADF fits).
+        let history_obs: Vec<(Venue, f64)> = snapshots
+            .iter()
+            .map(|s| (s.venue, s.funding_rate_annual.0))
+            .collect();
+        history.record_tick(symbol, ts_ms, &history_obs);
+
         // ── Step 3: Fair value ────────────────────────────────────────────
         let fair_value = fair_value::compute_weighted_fair_value(&snapshots);
         info!(
@@ -253,6 +294,45 @@ impl TickEngine {
             self.min_spread_threshold,
             held_for_hysteresis.as_ref(),
         );
+
+        // ── Step 4b: Forecast scoring (regime, OU, breakeven, Bernstein) ──
+        // Uses the accumulated history; returns Insufficient on <50 samples.
+        let spread_series = history.spread_series(symbol);
+        let spread_values = history.spread_values(symbol);
+        let current_spread = proposed.as_ref().map(|d| d.spread_annual).unwrap_or(0.0);
+        let cost_fraction = proposed.as_ref().map(|d| d.cost_fraction).unwrap_or(0.0);
+        let (delta_bound, sigma_per_h) =
+            scoring::infer_spread_dynamics(&spread_series, dt_seconds / 3600.0);
+        let forecast = scoring::score(ScoringInputs {
+            spread_series: &spread_series,
+            spread_values: &spread_values,
+            current_spread_annual: current_spread,
+            cost_fraction,
+            dt_hours: (dt_seconds / 3600.0).max(1e-6),
+            mmr: 0.03, // common DEX MMR floor; will be per-venue once exchange metadata is live
+            delta_bound_per_h: delta_bound,
+            sigma_per_h,
+        });
+
+        // Apply forecast verdict to the proposed notional. Admit=1.0,
+        // Reduce=0.5, Reject=0.0. When history is Insufficient the verdict
+        // is Admit (bootstrap). The CYCLE_LOCK still sees the *scaled*
+        // notional so the lock won't hold an oversized stale position.
+        let forecast_scale = scoring::verdict_size_scale(forecast.verdict);
+        let proposed = proposed.map(|mut d| {
+            d.notional_usd *= forecast_scale;
+            d
+        });
+        if forecast.verdict != ForecastVerdict::Admit {
+            info!(
+                symbol = %symbol,
+                regime = ?forecast.regime,
+                verdict = ?forecast.verdict,
+                tau_be_h = ?forecast.tau_be_hours,
+                leverage = ?forecast.leverage_bound,
+                "forecast: reduced/rejected by admission gate"
+            );
+        }
 
         // ── Step 5: Iron law enforcement (I-LOCK) ─────────────────────────
         let outcome: EnforceOutcome = cycle_lock_registry.enforce_decision(
@@ -291,7 +371,47 @@ impl TickEngine {
         }
 
         // ── Step 6: NAV accrual (uses effective, not proposed) ────────────
-        let nav_point = nav_tracker.accrue(ts_ms, effective.as_ref(), dt_seconds);
+        // Pass the live fair_value so the tracker updates its MTM anchor
+        // and the NavBreakdown includes basis-P&L telemetry.
+        let fv_for_mtm = if fair_value.healthy {
+            Some(fair_value.p_star)
+        } else {
+            None
+        };
+        let nav_point =
+            nav_tracker.accrue_with_fair_value(ts_ms, effective.as_ref(), dt_seconds, fv_for_mtm);
+
+        // Record NAV delta into CVaR + drawdown guards (Rockafellar-Uryasev
+        // rolling window for CVaR_99 vs budget99 frac).
+        risk_stack.on_nav_update(nav_point.nav_usd, nav_point.delta_usd);
+
+        // ── Step 7: Risk stack evaluation (6-guard composite) ────────────
+        let exposures = risk::build_exposures(effective.as_ref().into_iter().flat_map(|d| {
+            std::iter::once((d.long_venue, d.notional_usd))
+                .chain(std::iter::once((d.short_venue, d.notional_usd)))
+        }));
+        let risk_decision = risk_stack.evaluate(
+            nav_point.nav_usd,
+            &exposures,
+            &[], // basis_history wired in P7 step
+            now_instant,
+        );
+        let risk_size_multiplier = risk_decision.size_multiplier();
+
+        // Apply the worst-decision size multiplier to the effective decision.
+        // Flatten/Block → notional forced to 0; Reduce → proportional.
+        let effective = effective.map(|mut d| {
+            d.notional_usd *= risk_size_multiplier;
+            d
+        });
+        if !matches!(risk_decision, RiskDecision::Pass) {
+            warn!(
+                symbol = %symbol,
+                ?risk_decision,
+                size_multiplier = risk_size_multiplier,
+                "risk_stack: non-pass decision applied"
+            );
+        }
 
         let cycle_state = cycle_lock_registry.state_for(symbol);
         let lock_info = CycleLockInfo::from_outcome(&outcome, cycle_state, now_s);
@@ -306,6 +426,9 @@ impl TickEngine {
             cycle_lock: lock_info,
             adapter_health: health_snapshot,
             nav_after: nav_point.nav_usd,
+            risk_decision,
+            risk_size_multiplier,
+            forecast,
         })
     }
 }

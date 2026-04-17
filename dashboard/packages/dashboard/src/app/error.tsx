@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import DolHeroImage from "@/components/DolHeroImage";
+import { reportError } from "@/lib/reportError";
 
 /**
  * Global error boundary. Catches unexpected runtime errors in the
@@ -17,9 +18,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Surface to console for debugging but don't show to user
-    // eslint-disable-next-line no-console
-    console.error("[Dol] Unhandled error:", error);
+    reportError(error, { source: "root" });
   }, [error]);
 
   return (

@@ -88,8 +88,7 @@ contract MockMoonwellMarket is IMoonwellMarket {
         Account memory acc = accounts[account];
         if (acc.principal == 0) return 0;
         uint256 elapsed = block.timestamp - acc.lastUpdate;
-        uint256 interest =
-            (acc.principal * APY_BPS * elapsed) / (BPS_DENOMINATOR * SECONDS_PER_YEAR);
+        uint256 interest = (acc.principal * APY_BPS * elapsed) / (BPS_DENOMINATOR * SECONDS_PER_YEAR);
         return acc.principal + interest;
     }
 
@@ -109,8 +108,7 @@ contract MockMoonwellMarket is IMoonwellMarket {
     function _accrue(Account storage acc) internal {
         if (acc.principal > 0) {
             uint256 elapsed = block.timestamp - acc.lastUpdate;
-            uint256 interest =
-                (acc.principal * APY_BPS * elapsed) / (BPS_DENOMINATOR * SECONDS_PER_YEAR);
+            uint256 interest = (acc.principal * APY_BPS * elapsed) / (BPS_DENOMINATOR * SECONDS_PER_YEAR);
             acc.principal += interest;
         }
         acc.lastUpdate = block.timestamp;

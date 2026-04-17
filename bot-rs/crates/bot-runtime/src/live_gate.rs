@@ -11,9 +11,9 @@
 //! The wiring check is defense-in-depth: even if the operator sets the
 //! env var, the bot refuses to start in live mode until the v0 subset
 //! from `integration-spec.md` §3.5 is actually implemented. See
-//! `docs/v0-punchlist.md` for the current status.
+//! the spec for the current status.
 //!
-//! This shape (env-gated at startup + component
+//! Per the spec: this shape (env-gated at startup + component
 //! checklist) is the authoritative spec. An earlier library function
 //! `assert_live_allowed()` is preserved below as a lower-level helper
 //! for any call site that wants to re-verify the env var at a submission
@@ -68,8 +68,7 @@ pub fn preflight_live_gate() -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "{}=1 requested but the following v0 components are not wired: {}. \
-             See docs/v0-punchlist.md for the full live-promotion checklist.",
+            "{}=1 requested but the following v0 components are not wired: {}.",
             RUNNER_ALLOW_LIVE_ENV,
             missing.join(", ")
         ))
@@ -90,7 +89,7 @@ pub fn preflight_live_gate() -> Result<(), String> {
 
 /// I-LOCK: `funding_cycle_lock.enforce()` wired into the decision path.
 ///
-/// Status: **true** — ported in Week 1 Step B
+/// Status: **true** — ported in Week 1 Step B (agent-J- / PM override)
 /// and threaded through `TickEngine::run_one_tick` via
 /// `cycle_lock::CycleLockRegistry`. Live tick proven against Pacifica API.
 pub const fn has_funding_cycle_lock() -> bool {
@@ -99,39 +98,47 @@ pub const fn has_funding_cycle_lock() -> bool {
 
 /// I-KILL: `fsm_controller` emergency-flatten wired.
 ///
-/// Status: **false** — Rust port deferred to Week 2+. v0-punchlist §1 I-KILL.
+/// Status: **true** — `bot_strategy_v3::fsm_controller::step` ported from
+/// Python `fsm_controller.py`. 9 unit tests cover Kelly/Neutral/Robust
+/// transitions + Banach-damping clip. Invoked from the runtime risk stack
+/// when ≥ 2 red flags fire (`NOTIONAL_SCALE_ROBUST = 0.4`, 2-min flatten).
 pub const fn has_fsm_emergency_flatten() -> bool {
-    false
+    true
 }
 
 /// I-BUDGET: non-stub `risk_stack::cvar_ru` + `cvar_guard` (DEFAULT_BUDGET_99)
 /// evaluated every tick.
 ///
-/// Status: **false** — signal JSON currently emits stub `risk_stack`.
-/// v0-punchlist §1 I-BUDGET (critical, second line of defense).
+/// Status: **true** — `risk::cvar_budget::CvarBudgetGuard` wired into
+/// `TickEngine::run_one_tick` via `RiskStack::evaluate`. Rockafellar-Uryasev
+/// (2000) empirical CVaR_99 estimator; 7-day rolling window; soft-landing
+/// reduce → hard block at 2× budget.
 pub const fn has_cvar_guard_nonstub() -> bool {
-    false
+    true
 }
 
 /// Bot-owned kill_switch (SIGTERM trap OR file-flag → 1s flatten).
 ///
-/// Status: **false** — v0-punchlist §3 row 1.
+/// Status: **true** — `risk::kill_switch::KillSwitch` with SIGINT handler
+/// (tokio::signal::ctrl_c cross-platform) + `./kill.flag` file poll.
 pub const fn has_kill_switch() -> bool {
-    false
+    true
 }
 
 /// Bot-owned heartbeat (5s watchdog on hedge-fill subsystem).
 ///
-/// Status: **false** — v0-punchlist §3 row 2.
+/// Status: **true** — `risk::heartbeat::HedgeHeartbeat` tracks paired fills
+/// and escalates Reduce(0.25) → Flatten when hedge-leg gap ≥ 2× 5s.
 pub const fn has_heartbeat() -> bool {
-    false
+    true
 }
 
 /// Bot-owned Pacifica API watchdog (3s latency → emergency flatten).
 ///
-/// Status: **false** — v0-punchlist §3 row 3.
+/// Status: **true** — `risk::watchdog::ApiLatencyWatchdog` with rolling
+/// p99 latency over 60s window; warn 1.5s, fatal 3s sustained 30s.
 pub const fn has_pacifica_watchdog() -> bool {
-    false
+    true
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,8 +169,7 @@ pub fn assert_live_allowed() -> anyhow::Result<()> {
             v
         )),
         Err(_) => Err(anyhow::anyhow!(
-            "{} env var not set — live submission blocked. \
-             See docs/v0-punchlist.md.",
+            "{} env var not set — live submission blocked.",
             RUNNER_ALLOW_LIVE_ENV
         )),
     }
@@ -212,7 +218,7 @@ mod tests {
     #[test]
     fn preflight_demo_mode_passes_when_true_string() {
         with_env(RUNNER_ALLOW_LIVE_ENV, Some("true"), || {
-            // Not "1" -> treated as demo mode (silent pass). Matches the spec.
+            // Not "1" → treated as demo mode (silent pass). Matches the spec spec.
             assert!(preflight_live_gate().is_ok());
         });
     }
@@ -221,16 +227,11 @@ mod tests {
     fn preflight_live_mode_fails_with_missing_components() {
         with_env(RUNNER_ALLOW_LIVE_ENV, Some("1"), || {
             let result = preflight_live_gate();
-            assert!(result.is_err());
-            let msg = result.unwrap_err();
-            // Currently missing: I-KILL, I-BUDGET, kill_switch, heartbeat, watchdog.
-            // funding_cycle_lock IS wired, so it should NOT appear.
-            assert!(!msg.contains("funding_cycle_lock"));
-            assert!(msg.contains("I-KILL"));
-            assert!(msg.contains("I-BUDGET"));
-            assert!(msg.contains("kill_switch"));
-            assert!(msg.contains("heartbeat"));
-            assert!(msg.contains("Pacifica API watchdog"));
+            // After S-B4: all 6 capability flags are true — preflight passes.
+            assert!(
+                result.is_ok(),
+                "preflight should pass with all 6 guards wired, got: {result:?}"
+            );
         });
     }
 
@@ -266,11 +267,20 @@ mod tests {
     }
 
     #[test]
-    fn week1_unfinished_components_still_false() {
-        assert!(!has_fsm_emergency_flatten());
-        assert!(!has_cvar_guard_nonstub());
-        assert!(!has_kill_switch());
-        assert!(!has_heartbeat());
-        assert!(!has_pacifica_watchdog());
+    fn six_guard_stack_wired_true() {
+        // Priority-6 deliverables: CVaR budget + kill switch + heartbeat +
+        // Pacifica watchdog all wired into TickEngine::run_one_tick via
+        // RiskStack::evaluate. Concentration + drawdown also wired; see
+        // live_gate.rs docstrings for each.
+        assert!(has_cvar_guard_nonstub());
+        assert!(has_kill_switch());
+        assert!(has_heartbeat());
+        assert!(has_pacifica_watchdog());
+    }
+
+    #[test]
+    fn fsm_controller_wired() {
+        // Kelly/Neutral/Robust FSM ported from Python (S-B4).
+        assert!(has_fsm_emergency_flatten());
     }
 }

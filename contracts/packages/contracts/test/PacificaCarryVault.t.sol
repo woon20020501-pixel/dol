@@ -113,7 +113,9 @@ contract PacificaCarryVaultTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0, // minReportInterval disabled for baseline tests
+            0 // maxDailyDeltaBps disabled for baseline tests
         );
 
         // Fund test users
@@ -338,19 +340,27 @@ contract PacificaCarryVaultTest is Test {
     // DISABLED ERC-4626 FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Standard ERC-4626 withdraw is disabled.
-    /// Protects: forces all withdrawals through the queue.
-    function test_withdraw_disabled() public {
+    /// @notice `withdraw(assets, receiver, controller)` is repurposed as
+    ///         EIP-7540 async claim (post-B3). Without a pending claimable
+    ///         request it reverts `AsyncClaimNoReadyRequest`, still
+    ///         preventing sync ERC-4626 semantics from bypassing cooldown.
+    /// Protects: queue-enforcement on the sync ERC-4626 path.
+    function test_withdraw_syncPathDisabled_revertsAsyncClaim() public {
         vm.prank(alice);
-        vm.expectRevert(PacificaCarryVault.WithdrawDisabled.selector);
+        vm.expectRevert(PacificaCarryVault.AsyncClaimNoReadyRequest.selector);
         vault.withdraw(100e6, alice, alice);
     }
 
-    /// @notice Standard ERC-4626 redeem is disabled.
-    /// Protects: forces all withdrawals through the queue.
-    function test_redeem_disabled() public {
+    /// @notice `redeem(shares, receiver, controller)` is repurposed as
+    ///         EIP-7540 async claim. When no pending claimable request
+    ///         exists for the controller, it reverts with
+    ///         `AsyncClaimNoReadyRequest` — NOT with `WithdrawDisabled`.
+    /// Protects: sync ERC-4626 redeem is effectively disabled (no claimable
+    ///          request when caller hasn't gone through requestWithdraw
+    ///          first), while EIP-7540 compliance is preserved.
+    function test_redeem_syncPathDisabled_revertsAsyncClaim() public {
         vm.prank(alice);
-        vm.expectRevert(PacificaCarryVault.WithdrawDisabled.selector);
+        vm.expectRevert(PacificaCarryVault.AsyncClaimNoReadyRequest.selector);
         vault.redeem(100e6, alice, alice);
     }
 
@@ -815,7 +825,7 @@ contract PacificaCarryVaultTest is Test {
         vm.prank(alice);
         uint256 requestId = vault.requestWithdraw(shares);
 
-        (, uint256 owed, , ) = vault.withdrawRequests(requestId);
+        (, uint256 owed, , , ) = vault.withdrawRequests(requestId);
         // With 10150 totalAssets and 10000 supply, convertToAssets(10000) ≈ 10150
         assertGe(owed, 10_149e6, "claim should reflect treasury yield");
         assertLe(owed, 10_151e6, "claim should reflect treasury yield");
@@ -874,7 +884,9 @@ contract PacificaCarryVaultTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0, // minReportInterval
+            0 // maxDailyDeltaBps
         );
 
         vm.prank(alice);
@@ -900,7 +912,9 @@ contract PacificaCarryVaultTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0, // minReportInterval
+            0 // maxDailyDeltaBps
         );
 
         // Normal deposit succeeds — failMint is false initially.
@@ -1130,4 +1144,23 @@ contract PacificaCarryVaultTest is Test {
         assertEq(usdc.balanceOf(newRecipient) - before, expectedFee, "new recipient got fee");
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // COVERAGE-GAP TEST (2026-04-17)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Constructor reverts if feeRecipient is zero.
+    /// Branch: PacificaCarryVault.sol:218
+    function test_constructor_zeroFeeRecipient_reverts() public {
+        vm.expectRevert(PacificaCarryVault.ZeroAddress.selector);
+        new PacificaCarryVault(
+            IERC20(address(usdc)),
+            treasury,
+            operator,
+            guardian,
+            COOLDOWN,
+            address(0), // zero fee recipient → revert
+            0,
+            0
+        );
+    }
 }

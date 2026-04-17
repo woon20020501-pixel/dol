@@ -71,7 +71,7 @@ export function MobileMenu({ links }: { links: MobileMenuLink[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:hidden"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:hidden"
         aria-label="Open menu"
         aria-expanded={open}
         aria-controls="mobile-menu-panel"
@@ -113,7 +113,7 @@ export function MobileMenu({ links }: { links: MobileMenuLink[] }) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   aria-label="Close menu"
                 >
                   <X className="h-4 w-4" />

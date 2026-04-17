@@ -3,14 +3,14 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
- * GET /api/signal -- server-side reader for per-symbol signal JSONs.
+ * GET /api/signal — server-side reader for the bot's per-symbol signal JSONs.
  *
- * Reads the latest signal JSON for each known symbol so the dashboard can
- * surface live values for fields that don't appear in nav.jsonl:
- * pair_decision, cycle_lock, fair_value, contributing_venues, fsm mode,
- * diagnostics.stubbed_sections, etc.
+ *  /  Option A. Reads the latest signal JSON for each
+ * known symbol so the dashboard can surface live values for fields that
+ * don't appear in nav.jsonl: pair_decision, cycle_lock, fair_value
+ * contributing_venues, fsm mode, diagnostics.stubbed_sections, etc.
  *
- * Path layout:
+ * Path layout (the bot ):
  *   <demo_smoke>/signals/{symbol}/{yyyymmdd}/{ts_ms}.json
  *
  * One file per (symbol, tick). To grab the latest per symbol we walk the
@@ -93,24 +93,44 @@ async function readLatestSignal(
   }
 }
 
+/**
+ * Production fallback: a bundled snapshot of 10 latest signal JSONs
+ * at public/demo/signals.json. Mirrors the /api/nav snapshot path —
+ * when the live bot directory isn't reachable (Vercel deployment),
+ * we serve this frozen-but-real payload so the dashboard shows LIVE
+ * signals instead of the SIM fallback.
+ */
+const PUBLIC_SIGNALS_PATH = path.resolve(
+  process.cwd(),
+  "public/demo/signals.json",
+);
+
+async function readPublicSignalsSnapshot(): Promise<{
+  signals: Record<string, unknown>;
+  mtimeMs: number;
+} | null> {
+  try {
+    const stat = await fs.stat(PUBLIC_SIGNALS_PATH);
+    const text = await fs.readFile(PUBLIC_SIGNALS_PATH, "utf8");
+    const parsed = JSON.parse(text) as { signals: Record<string, unknown> };
+    if (!parsed.signals || typeof parsed.signals !== "object") return null;
+    return { signals: parsed.signals, mtimeMs: stat.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const symbolParam = url.searchParams.get("symbol");
   const root = resolveSignalsRoot();
 
-  // Verify the root exists. If not, fall back to simulator on the client.
+  // Tier 1: live bot output directory (local dev).
+  let rootReachable = true;
   try {
     await fs.stat(root);
   } catch {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "signals_root_missing",
-        detail: `signals root not found at ${root}`,
-        fallback_to_simulator: true,
-      },
-      { status: 200, headers: { "Cache-Control": "no-store" } },
-    );
+    rootReachable = false;
   }
 
   const symbolList = symbolParam
@@ -119,39 +139,62 @@ export async function GET(req: Request) {
 
   const signals: Record<string, unknown> = {};
   let maxMtime = 0;
+  let source: "live" | "snapshot" = "live";
 
-  await Promise.all(
-    symbolList.map(async (sym) => {
-      const result = await readLatestSignal(root, sym);
-      if (result) {
-        signals[sym] = result.data;
-        if (result.mtimeMs > maxMtime) maxMtime = result.mtimeMs;
+  if (rootReachable) {
+    await Promise.all(
+      symbolList.map(async (sym) => {
+        const result = await readLatestSignal(root, sym);
+        if (result) {
+          signals[sym] = result.data;
+          if (result.mtimeMs > maxMtime) maxMtime = result.mtimeMs;
+        }
+      }),
+    );
+  }
+
+  // Tier 2: if the live directory yielded nothing, try the bundled
+  // snapshot. This is what Vercel serves.
+  if (Object.keys(signals).length === 0) {
+    const snap = await readPublicSignalsSnapshot();
+    if (snap) {
+      for (const sym of symbolList) {
+        if (snap.signals[sym]) signals[sym] = snap.signals[sym];
       }
-    }),
-  );
+      maxMtime = snap.mtimeMs;
+      source = "snapshot";
+    }
+  }
 
   if (Object.keys(signals).length === 0) {
     return NextResponse.json(
       {
         ok: false,
         error: "signals_empty",
-        detail: "no signal JSON found for any symbol",
+        detail: "no signal JSON found in live dir or public snapshot",
         fallback_to_simulator: true,
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
     );
   }
 
-  const isStale = Date.now() - maxMtime > STALE_THRESHOLD_MS;
+  // Same staleness rule as /api/nav: snapshot source is never stale
+  // (the bundle is intentionally frozen — not a symptom of a dead
+  // bot). Live source uses the 30-second mtime threshold.
+  const isStale =
+    source === "snapshot"
+      ? false
+      : Date.now() - maxMtime > STALE_THRESHOLD_MS;
 
   return NextResponse.json(
     {
       ok: true,
       signals,
+      source,
       n_symbols: Object.keys(signals).length,
       file_mtime_ms_max: maxMtime,
       is_stale: isStale,
-      signals_root: root,
+      signals_root: source === "snapshot" ? PUBLIC_SIGNALS_PATH : root,
     },
     { status: 200, headers: { "Cache-Control": "no-store" } },
   );

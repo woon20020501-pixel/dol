@@ -10,6 +10,11 @@ import type { Metadata } from "next";
  * their portfolio, distinct from the landing hero copy. noindex so we
  * don't expose per-user URLs to search — matches robots.ts.
  */
+// Note: openGraph.images and twitter.images are intentionally OMITTED
+// so this route inherits the dynamic opengraph-image.tsx at the app
+// root (1200x630 PNG, ~50 KB, generated at build). Previously we had
+// static "/images/dol.png" references here which pulled the 4.3 MB
+// hero artwork — slow social previews on Twitter/Slack/Discord.
 export const metadata: Metadata = {
   title: "Your Dol",
   description:
@@ -18,7 +23,6 @@ export const metadata: Metadata = {
     title: "Your Dol · Dol",
     description:
       "Watch your Dol grow in real time. Cash out anytime — instant or scheduled.",
-    images: ["/images/dol.png"],
     type: "website",
     siteName: "Dol",
   },
@@ -27,7 +31,6 @@ export const metadata: Metadata = {
     title: "Your Dol · Dol",
     description:
       "Watch your Dol grow in real time. Cash out anytime — instant or scheduled.",
-    images: ["/images/dol.png"],
   },
   robots: {
     index: false,

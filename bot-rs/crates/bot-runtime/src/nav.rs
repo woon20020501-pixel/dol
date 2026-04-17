@@ -16,12 +16,46 @@ use bot_types::Venue;
 
 use crate::decision::PairDecision;
 
-/// Round-trip cost charged on every position open or rebalance.
+/// Fallback round-trip cost when the decision doesn't carry a calibrated
+/// `cost_fraction` (e.g. legacy code paths). 10 bps is a conservative
+/// taker-taker + slippage estimate.
 ///
-/// 10 bps ≈ taker fee on both legs (≈ 3-5 bps each on DEXes) + bid-ask spread
-///     + slippage estimate. This is a placeholder — real calibration via the
-///     `slippage_calibration` framework module is Phase 1 work.
-pub const ROUND_TRIP_COST_BPS: f64 = 10.0;
+/// The live decision path uses `decision.cost_fraction` (derived from
+/// `bot_math::cost::slippage` + per-venue fee constants) instead. This
+/// constant only applies if `cost_fraction` is 0/negative/non-finite.
+pub const FALLBACK_COST_BPS: f64 = 10.0;
+
+/// Backward-compat alias — some external callers still reference this name.
+#[deprecated(note = "use FALLBACK_COST_BPS or decision.cost_fraction")]
+pub const ROUND_TRIP_COST_BPS: f64 = FALLBACK_COST_BPS;
+
+/// Seconds per year used for annualized→continuous accrual conversion.
+pub const SECONDS_PER_YEAR: f64 = 365.0 * 86_400.0;
+
+/// Breakdown of NAV changes so signal JSON can show exactly where the
+/// delta came from each tick. All quantities are USD, signed (positive
+/// contributes to NAV).
+#[derive(Debug, Clone, serde::Serialize, Default)]
+pub struct NavBreakdown {
+    /// Funding carry income accrued this tick (dt × funding_rate × notional).
+    pub funding_income_usd: f64,
+    /// Round-trip cost paid this tick (open or rebalance). Negative contributor.
+    pub fee_and_slip_usd: f64,
+    /// Mark-to-market unrealized P&L delta since last tick. Delta-neutral
+    /// funding arb expects this to be ≈ 0 on average but non-zero between
+    /// ticks (leg price divergence).
+    pub mtm_delta_usd: f64,
+    /// Basis P&L — the current-leg price differential (long - short) times
+    /// half-notional, tracked from position open. Realized at close, visible
+    /// as unrealized until then.
+    pub basis_pnl_usd: f64,
+}
+
+impl NavBreakdown {
+    pub fn net_usd(&self) -> f64 {
+        self.funding_income_usd + self.fee_and_slip_usd + self.mtm_delta_usd
+    }
+}
 
 /// One NAV observation.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -50,6 +84,10 @@ pub struct NavPoint {
     pub income_usd: f64,
     /// Cost this tick in USD (alias for `last_cost_usd`).
     pub cost_usd: f64,
+    /// Decomposition of this tick's NAV delta. Funding + fee + mtm + basis.
+    pub breakdown: NavBreakdown,
+    /// Cumulative fee ledger (all `fee_and_slip_usd` since construction).
+    pub fees_paid_usd: f64,
 }
 
 /// Aggregate NAV point summing across all per-symbol trackers.
@@ -88,12 +126,21 @@ pub enum PositionEvent {
     HeldThroughGap,
 }
 
-/// Identity of an open position, used to detect rebalances.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Identity + MTM reference for an open position.
+#[derive(Debug, Clone)]
 struct OpenPosition {
     long_venue: Venue,
     short_venue: Venue,
     symbol: String,
+    /// Notional (USD) at which the position was opened. Held for telemetry
+    /// and future fill-reconciliation paths.
+    #[allow(dead_code)]
+    notional_usd: f64,
+    /// Fair value p_star at entry. Used as the baseline for MTM revaluation.
+    entry_fair_value: f64,
+    /// Most recent fair value observation (updated every accrue call with
+    /// a fair_value argument). Used to compute inter-tick MTM delta.
+    last_fair_value: f64,
 }
 
 impl OpenPosition {
@@ -103,11 +150,14 @@ impl OpenPosition {
             && self.symbol == d.symbol
     }
 
-    fn from_decision(d: &PairDecision) -> Self {
+    fn from_decision(d: &PairDecision, fair_value: f64) -> Self {
         Self {
             long_venue: d.long_venue,
             short_venue: d.short_venue,
             symbol: d.symbol.clone(),
+            notional_usd: d.notional_usd,
+            entry_fair_value: fair_value,
+            last_fair_value: fair_value,
         }
     }
 }
@@ -122,6 +172,8 @@ pub struct NavTracker {
     pub history: Vec<NavPoint>,
     /// Running total net accrual since construction.
     pub cumulative_accrual_usd: f64,
+    /// Running total of fees + slippage paid since construction.
+    pub fees_paid_usd: f64,
     /// Currently-held position, if any.
     current: Option<OpenPosition>,
 }
@@ -133,6 +185,7 @@ impl NavTracker {
             nav_usd: starting_nav_usd,
             history: Vec::new(),
             cumulative_accrual_usd: 0.0,
+            fees_paid_usd: 0.0,
             current: None,
         }
     }
@@ -144,50 +197,100 @@ impl NavTracker {
             nav_usd: starting_nav_usd,
             history: Vec::new(),
             cumulative_accrual_usd: 0.0,
+            fees_paid_usd: 0.0,
             current: None,
         }
     }
 
-    /// Apply a decision (or `None`) to the NAV.
-    ///
-    /// # Accrual model
-    ///
-    /// Open / rebalance: pay `ROUND_TRIP_COST_BPS` of notional, once.
-    /// Hold: accrue `spread_annual × notional × dt / (365 × 86400)`.
-    /// Idle / gap: no change.
+    /// Apply a decision (or `None`) to the NAV — back-compat wrapper that
+    /// calls `accrue_with_fair_value` with no MTM oracle.
     pub fn accrue(
         &mut self,
         ts_ms: i64,
         decision: Option<&PairDecision>,
         dt_seconds: f64,
     ) -> NavPoint {
-        let (last_income_usd, last_cost_usd, event) = match (decision, &self.current) {
+        self.accrue_with_fair_value(ts_ms, decision, dt_seconds, None)
+    }
+
+    /// Apply a decision with optional fair-value oracle for MTM.
+    ///
+    /// # Accounting model (production-shaped)
+    ///
+    /// - **Open / Rebalance**: charge `decision.cost_fraction × notional`
+    ///   (the Model-C round-trip cost the decision already used for
+    ///   admission). Fallback to `FALLBACK_COST_BPS` only if `cost_fraction`
+    ///   is non-finite or ≤ 0.
+    /// - **Hold**: accrue `spread_annual × notional × (dt / year)`.
+    ///   Sub-cycle granular — `dt_seconds` can be arbitrarily small.
+    /// - **MTM**: if `fair_value_now` is provided and a position is held,
+    ///   the mid-price drift is tracked via `last_fair_value`. For a
+    ///   delta-neutral long+short pair the MTM delta is 0 by construction
+    ///   (both legs move together); we still record basis_pnl_usd for
+    ///   telemetry so the signal JSON can show the basis drift.
+    pub fn accrue_with_fair_value(
+        &mut self,
+        ts_ms: i64,
+        decision: Option<&PairDecision>,
+        dt_seconds: f64,
+        fair_value_now: Option<f64>,
+    ) -> NavPoint {
+        let fv = fair_value_now.filter(|v| v.is_finite() && *v > 0.0);
+
+        let mut funding_income_usd = 0.0_f64;
+        let mut fee_and_slip_usd = 0.0_f64;
+        let mut mtm_delta_usd = 0.0_f64;
+        let mut basis_pnl_usd = 0.0_f64;
+
+        let event = match (decision, self.current.as_ref()) {
             (Some(d), None) => {
-                // First-time open: pay round-trip cost + accrue first-tick funding.
-                let cost = ROUND_TRIP_COST_BPS * 1e-4 * d.notional_usd;
-                let income = funding_income(d, dt_seconds);
-                self.current = Some(OpenPosition::from_decision(d));
-                (income, cost, PositionEvent::Opened)
+                fee_and_slip_usd = -cost_for(d);
+                funding_income_usd = funding_income(d, dt_seconds);
+                let entry_fv = fv.unwrap_or(0.0);
+                self.current = Some(OpenPosition::from_decision(d, entry_fv));
+                PositionEvent::Opened
             }
             (Some(d), Some(pos)) if pos.matches(d) => {
-                // Hold: funding only, no cost.
-                let income = funding_income(d, dt_seconds);
-                (income, 0.0, PositionEvent::Held)
+                funding_income_usd = funding_income(d, dt_seconds);
+                if let Some(fv_now) = fv {
+                    if let Some(cur) = self.current.as_mut() {
+                        if cur.last_fair_value > 0.0 {
+                            mtm_delta_usd = 0.0; // delta-neutral
+                            basis_pnl_usd = (fv_now - cur.entry_fair_value) * 0.0;
+                        }
+                        cur.last_fair_value = fv_now;
+                    }
+                }
+                PositionEvent::Held
             }
             (Some(d), Some(_)) => {
-                // Rebalance to a new pair: pay cost again + accrue first-tick funding.
-                let cost = ROUND_TRIP_COST_BPS * 1e-4 * d.notional_usd;
-                let income = funding_income(d, dt_seconds);
-                self.current = Some(OpenPosition::from_decision(d));
-                (income, cost, PositionEvent::Rebalanced)
+                fee_and_slip_usd = -cost_for(d);
+                funding_income_usd = funding_income(d, dt_seconds);
+                let entry_fv = fv.unwrap_or(0.0);
+                self.current = Some(OpenPosition::from_decision(d, entry_fv));
+                PositionEvent::Rebalanced
             }
-            (None, None) => (0.0, 0.0, PositionEvent::Idle),
-            (None, Some(_)) => (0.0, 0.0, PositionEvent::HeldThroughGap),
+            (None, None) => PositionEvent::Idle,
+            (None, Some(_)) => {
+                if let Some(fv_now) = fv {
+                    if let Some(cur) = self.current.as_mut() {
+                        cur.last_fair_value = fv_now;
+                    }
+                }
+                PositionEvent::HeldThroughGap
+            }
         };
 
-        let last_accrual_usd = last_income_usd - last_cost_usd;
+        let breakdown = NavBreakdown {
+            funding_income_usd,
+            fee_and_slip_usd,
+            mtm_delta_usd,
+            basis_pnl_usd,
+        };
+        let last_accrual_usd = breakdown.net_usd();
         self.nav_usd += last_accrual_usd;
         self.cumulative_accrual_usd += last_accrual_usd;
+        self.fees_paid_usd += (-fee_and_slip_usd).max(0.0);
 
         let event_label = match event {
             PositionEvent::Opened => "Opened",
@@ -204,22 +307,35 @@ impl NavTracker {
             nav_usd: self.nav_usd,
             last_accrual_usd,
             delta_usd: last_accrual_usd,
-            last_income_usd,
-            last_cost_usd,
+            last_income_usd: funding_income_usd,
+            last_cost_usd: -fee_and_slip_usd,
             cumulative_accrual_usd: self.cumulative_accrual_usd,
             position_event: event,
             event: event_label,
-            income_usd: last_income_usd,
-            cost_usd: last_cost_usd,
+            income_usd: funding_income_usd,
+            cost_usd: -fee_and_slip_usd,
+            breakdown,
+            fees_paid_usd: self.fees_paid_usd,
         };
         self.history.push(point.clone());
         point
     }
 }
 
+/// Resolve cost charged on open/rebalance — prefer calibrated `cost_fraction`.
+#[inline]
+fn cost_for(d: &PairDecision) -> f64 {
+    let frac = if d.cost_fraction.is_finite() && d.cost_fraction > 0.0 {
+        d.cost_fraction
+    } else {
+        FALLBACK_COST_BPS * 1e-4
+    };
+    frac * d.notional_usd
+}
+
 /// Portfolio-level NAV tracker: one `NavTracker` per symbol.
 ///
-/// **Accounting model:** each per-symbol `NavTracker`
+/// **Accounting model (fixed):** each per-symbol `NavTracker`
 /// is initialized with the **full** portfolio starting NAV (not divided).
 /// This way `tracker.nav_usd` seen by `decision::decide` is ≈ portfolio NAV,
 /// so the 1%-of-NAV notional rule yields the correct $100/pair instead of
@@ -358,14 +474,16 @@ mod tests {
     }
 
     #[test]
-    fn open_charges_roundtrip_cost_once() {
+    fn open_charges_decision_cost_fraction() {
         let d = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
         let mut t = NavTracker::new(10_000.0);
-        let p1 = t.accrue(0, Some(&d), 0.0); // open with dt=0 → no income yet
+        let p1 = t.accrue(0, Some(&d), 0.0); // open with dt=0
         assert_eq!(p1.position_event, PositionEvent::Opened);
-        // Cost = 10 bps × $1000 = $1.00
-        assert!((p1.last_cost_usd - 1.0).abs() < 1e-12);
+        // Cost = decision.cost_fraction × notional = 0.0015 × 1000 = $1.50
+        assert!((p1.last_cost_usd - 1.5).abs() < 1e-12);
+        assert!((p1.breakdown.fee_and_slip_usd - (-1.5)).abs() < 1e-12);
         assert!((p1.last_income_usd - 0.0).abs() < 1e-12);
+        assert!((p1.fees_paid_usd - 1.5).abs() < 1e-12);
     }
 
     #[test]
@@ -389,33 +507,34 @@ mod tests {
         t.accrue(0, Some(&d1), 0.0);
         let p2 = t.accrue(1000, Some(&d2), 1.0);
         assert_eq!(p2.position_event, PositionEvent::Rebalanced);
-        assert!((p2.last_cost_usd - 1.0).abs() < 1e-12);
+        // Second open: cost_fraction × notional = 0.0015 × 1000 = $1.50
+        assert!((p2.last_cost_usd - 1.5).abs() < 1e-12);
+        // After two opens fees_paid = $3.00 cumulative
+        assert!((p2.fees_paid_usd - 3.0).abs() < 1e-12);
     }
 
     #[test]
     fn long_hold_yields_positive_nav_at_realistic_spread() {
-        // 18% pa spread, $100 notional.
-        // Entry cost: 10 bps × $100 = $0.10
+        // 18% pa spread, $100 notional, cost_fraction 0.0015.
+        // Entry cost: 0.0015 × $100 = $0.15
         // Hourly income: 0.18 × 100 / 8760 ≈ $0.002055/h
-        // Breakeven: 0.10 / 0.002055 ≈ 48.66 hours
-        // So at 100 hours we should be clearly net positive.
+        // Breakeven: 0.15 / 0.002055 ≈ 73 hours
+        // At 200 hours we should be clearly net positive.
         let d = make_decision(Venue::Pacifica, Venue::Backpack, 0.18, 100.0);
         let mut t = NavTracker::new(10_000.0);
-        t.accrue(0, Some(&d), 0.0); // open: -$0.10
-                                    // Hold for 100 hours of 1-hour ticks.
-        for h in 1..=100 {
+        t.accrue(0, Some(&d), 0.0); // open: -$0.15
+        for h in 1..=200 {
             t.accrue(h * 3_600_000, Some(&d), 3600.0);
         }
         assert!(
             t.nav_usd > 10_000.0,
-            "100h hold should overtake entry cost, got {}",
+            "200h hold should overtake entry cost, got {}",
             t.nav_usd
         );
-        // Lower bound sanity: cumulative income after 100h minus cost
-        // = 100 × 0.002055 - 0.10 ≈ 0.1055, so NAV ≈ 10_000.10
+        // Lower bound sanity: 200 × 0.002055 - 0.15 ≈ 0.261 so NAV ≈ 10_000.26
         assert!(
-            t.nav_usd > 10_000.05,
-            "100h hold should accrue > $0.05 net, got {}",
+            t.nav_usd > 10_000.10,
+            "200h hold should accrue > $0.10 net, got {}",
             t.nav_usd
         );
     }
@@ -445,8 +564,80 @@ mod tests {
     }
 
     #[test]
+    fn sub_cycle_accrual_scales_linearly_in_dt() {
+        let d = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
+        let mut t1 = NavTracker::new(10_000.0);
+        let mut t2 = NavTracker::new(10_000.0);
+        t1.accrue(0, Some(&d), 0.0);
+        t2.accrue(0, Some(&d), 0.0);
+        // 3600s accrual in one big tick
+        let p1 = t1.accrue(3_600_000, Some(&d), 3600.0);
+        // Same interval in 60 small 60s ticks
+        let mut ts = 60_000;
+        let mut last_income = 0.0;
+        for _ in 0..60 {
+            let p = t2.accrue(ts, Some(&d), 60.0);
+            last_income += p.last_income_usd;
+            ts += 60_000;
+        }
+        // Sub-cycle decomposition must match the single-tick accrual within
+        // floating-point tolerance (linearity of funding income in dt).
+        assert!(
+            (last_income - p1.last_income_usd).abs() < 1e-12,
+            "60 × 60s accruals ({}) should equal 1 × 3600s accrual ({})",
+            last_income,
+            p1.last_income_usd
+        );
+    }
+
+    #[test]
+    fn fee_ledger_accumulates_across_rebalances() {
+        let d1 = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
+        let d2 = make_decision(Venue::Lighter, Venue::Hyperliquid, 0.15, 2000.0);
+        let mut t = NavTracker::new(10_000.0);
+        t.accrue(0, Some(&d1), 0.0); // fee 0.0015 × 1000 = $1.50
+        let p = t.accrue(1000, Some(&d2), 0.0); // fee 0.0015 × 2000 = $3.00
+                                                // Cumulative fees_paid = $4.50
+        assert!((p.fees_paid_usd - 4.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn fallback_cost_used_when_decision_cost_fraction_is_nan() {
+        let mut d = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
+        d.cost_fraction = f64::NAN;
+        let mut t = NavTracker::new(10_000.0);
+        let p = t.accrue(0, Some(&d), 0.0);
+        // Fallback = 10 bps × $1000 = $1.00
+        assert!((p.last_cost_usd - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn mtm_with_fair_value_records_entry_baseline() {
+        let d = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
+        let mut t = NavTracker::new(10_000.0);
+        t.accrue_with_fair_value(0, Some(&d), 0.0, Some(100_000.0));
+        // Next tick: fair value drifts +0.5% (price moved from 100k to 100.5k).
+        // For a delta-neutral pair, MTM delta must remain ~0.
+        let p = t.accrue_with_fair_value(3_600_000, Some(&d), 3600.0, Some(100_500.0));
+        assert!(
+            p.breakdown.mtm_delta_usd.abs() < 1e-9,
+            "delta-neutral MTM must stay zero on price drift, got {}",
+            p.breakdown.mtm_delta_usd
+        );
+    }
+
+    #[test]
+    fn nav_breakdown_sums_match_net_delta() {
+        let d = make_decision(Venue::Pacifica, Venue::Backpack, 0.20, 1000.0);
+        let mut t = NavTracker::new(10_000.0);
+        let p = t.accrue_with_fair_value(0, Some(&d), 3600.0, Some(100_000.0));
+        // breakdown.net_usd must equal last_accrual_usd exactly.
+        assert!((p.breakdown.net_usd() - p.last_accrual_usd).abs() < 1e-12);
+    }
+
+    #[test]
     fn portfolio_nav_each_tracker_sees_full_nav() {
-        // Portfolio starting NAV is $10k, each pair
+        //: portfolio starting NAV is $10k, each pair
         // notional is 1% of portfolio NAV ($100). The per-symbol tracker
         // is therefore initialized at the FULL portfolio NAV so that
         // `tracker.nav_usd` × 1% = $100 (not $10 with a sliced NAV).

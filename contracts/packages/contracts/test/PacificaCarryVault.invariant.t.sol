@@ -38,6 +38,25 @@ contract VaultHandler is Test {
     ///      but kept assets, temporarily inflating the price).
     bool public ghost_lastActionWasClaim;
 
+    // ─── Ghost variables for new invariants (hackathon hardening) ──────
+
+    /// @dev Maximum `lastTimestamp` observed on the vault across all actions.
+    ///      Used by `invariant_navTimestampMonotonic`.
+    uint256 public ghost_maxSeenTimestamp;
+
+    /// @dev Highest `nextRequestId` observed. Used by `invariant_requestIdsMonotonic`.
+    uint256 public ghost_highestRequestIdSeen;
+
+    /// @dev Whether `navInitialized` was observed `true` in any state.
+    ///      Used by `invariant_navInitMonotonic`.
+    bool public ghost_navInitializedEverTrue;
+
+    /// @dev Tracks request IDs that have been claimed during fuzz runs.
+    ///      Used by `invariant_claimedStaysClaimed` to detect any regression
+    ///      of the `claimed` flag.
+    mapping(uint256 => bool) internal _wasClaimed;
+    uint256[] internal _trackedRequestIds;
+
     address[] internal actors;
     uint256[] internal pendingRequestIds;
 
@@ -99,6 +118,12 @@ contract VaultHandler is Test {
         vm.prank(actor);
         uint256 requestId = vault.requestWithdraw(shares);
         pendingRequestIds.push(requestId);
+        _trackedRequestIds.push(requestId);
+
+        // Ghost-state updates for monotonic request-id invariant
+        if (requestId > ghost_highestRequestIdSeen) {
+            ghost_highestRequestIdSeen = requestId;
+        }
 
         ghost_lastActionWasLoss = false;
         ghost_lastActionWasClaim = false;
@@ -110,7 +135,7 @@ contract VaultHandler is Test {
         if (vault.paused()) return;
 
         uint256 requestId = pendingRequestIds[requestIdSeed % pendingRequestIds.length];
-        (address user, uint256 assets, uint256 unlockTs, bool claimed) =
+        (address user, uint256 assets, , uint256 unlockTs, bool claimed) =
             vault.withdrawRequests(requestId);
 
         if (claimed || block.timestamp < unlockTs || user == address(0)) return;
@@ -126,6 +151,7 @@ contract VaultHandler is Test {
         vault.claimWithdraw(requestId);
 
         ghost_totalClaimed += assets;
+        _wasClaimed[requestId] = true;
         ghost_lastActionWasLoss = false;
         ghost_lastActionWasClaim = true;
     }
@@ -170,6 +196,10 @@ contract VaultHandler is Test {
         }
         ghost_lastActionWasClaim = false;
         ghost_lastReportedNav = newNav;
+
+        // Ghost-state updates for monotonic-timestamp + nav-init invariants
+        if (ts > ghost_maxSeenTimestamp) ghost_maxSeenTimestamp = ts;
+        if (vault.navInitialized()) ghost_navInitializedEverTrue = true;
     }
 
     /// @dev Fuzzed pause action (guardian only).
@@ -221,6 +251,30 @@ contract VaultHandler is Test {
         // This must always revert with InvalidNavSignature (or StaleTimestamp)
         vm.expectRevert();
         vault.reportNAV(newNav, timestamp, sig);
+    }
+
+    // ── External view helpers (read-only for invariants) ───────────────
+
+    /// @notice Sum of `assets` across all unclaimed withdraw requests.
+    ///         Used by `invariant_solvencyVsPendingClaims`.
+    function sumPendingClaimAssets() external view returns (uint256 total) {
+        for (uint256 i = 0; i < _trackedRequestIds.length; i++) {
+            (, uint256 assets, , , bool claimed) =
+                vault.withdrawRequests(_trackedRequestIds[i]);
+            if (!claimed) total += assets;
+        }
+    }
+
+    /// @notice List of every request ID the handler has created.
+    ///         Used by `invariant_claimedStaysClaimed`.
+    function getTrackedRequestIds() external view returns (uint256[] memory) {
+        return _trackedRequestIds;
+    }
+
+    /// @notice Whether a given request ID was observed as claimed during
+    ///         the fuzz run. Used by `invariant_claimedStaysClaimed`.
+    function wasPreviouslyClaimed(uint256 id) external view returns (bool) {
+        return _wasClaimed[id];
     }
 
     // ── Internal helpers ────────────────────────────────────────────────
@@ -278,7 +332,9 @@ contract PacificaCarryVaultInvariantTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0,
+            0
         );
 
         handler = new VaultHandler(vault, usdc, treasury, OPERATOR_PK, guardian);
@@ -389,6 +445,126 @@ contract PacificaCarryVaultInvariantTest is Test {
             vault.operator(),
             operator,
             "operator address must not change without guardian action"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // NEW INVARIANTS (2026-04-17 hackathon hardening)
+    //
+    // These invariants formalize structural properties the contracts must
+    // maintain over any sequence of user actions. Each invariant comes with
+    // a brief mathematical specification and a rationale linking to the
+    // threat it defends.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Conditional solvency: when no NAV has been reported, total
+    ///         idle + treasury USDC plus historically claimed must be ≥
+    ///         pending queue liabilities.
+    /// @dev Formal (NAV-free): ¬navInitialized ⇒
+    ///        idle(s) + treasury(s) + Σclaimed ≥ Σ{r.assets : r ∈ queue, ¬r.claimed}
+    ///
+    ///      When `totalAssetsStored > 0`, `convertToAssets(shares)` includes
+    ///      the off-chain synthetic component, but `claimWithdraw` pays out
+    ///      from real idle+treasury USDC. A positive NAV report therefore
+    ///      locks synthetic value into new requests whose physical payout
+    ///      relies on operator-driven unwinds (out of scope for the
+    ///      handler). The negative NAV (loss) case has the same structural
+    ///      property — see H1 in `docs/AUDIT_PREP.md §1.2`.
+    ///
+    ///      This invariant formalizes the tight bound in the purely
+    ///      NAV-free regime the vault boots into, where it is the strongest
+    ///      mechanical solvency guarantee we can make without the H1
+    ///      share-locking refactor.
+    ///
+    /// Protects: solvency when the oracle has not yet contributed synthetic
+    ///           value. A violation indicates a real accounting bug outside
+    ///           the known H1 class.
+    function invariant_solvencyVsPendingClaims_navFree() public view {
+        if (vault.navInitialized()) return; // H1-scope; not asserted here
+
+        uint256 pending = handler.sumPendingClaimAssets();
+        // In the NAV-free regime, totalAssets() == idle + treasury + 0.
+        assertGe(
+            vault.totalAssets() + handler.ghost_totalClaimed(),
+            handler.ghost_totalDeposited() > 0 ? pending : 0,
+            "nav-free: pending claims must remain payable"
+        );
+    }
+
+    /// @notice Timestamp monotonicity on the NAV oracle.
+    /// @dev Formal: ∀ reports r_i, r_{i+1}: r_i.timestamp < r_{i+1}.timestamp
+    ///      Timestamps must strictly increase across successful reports, which
+    ///      means `lastTimestamp` is monotonically non-decreasing.
+    /// Protects: against timestamp replay (A5). A handler that successfully
+    ///           regresses lastTimestamp would break this invariant.
+    function invariant_navTimestampMonotonic() public view {
+        assertGe(
+            vault.lastTimestamp(),
+            handler.ghost_maxSeenTimestamp(),
+            "lastTimestamp must monotonically non-decrease"
+        );
+    }
+
+    /// @notice Withdraw queue integrity: nextRequestId is monotonic.
+    /// @dev Formal: nextRequestId_{t+1} ≥ nextRequestId_t.
+    ///      Request IDs are allocated sequentially and never reused.
+    /// Protects: request ID collision (structural attack surface).
+    function invariant_requestIdsMonotonic() public view {
+        assertGe(
+            vault.nextRequestId(),
+            handler.ghost_highestRequestIdSeen(),
+            "nextRequestId must be monotonically non-decreasing"
+        );
+    }
+
+    /// @notice Claimed requests stay claimed (absorption property).
+    /// @dev Formal: ∀ r ∈ withdrawQueue, once r.claimed == true it never
+    ///      returns to false within any subsequent state.
+    /// Protects: double-claim attacks (A3, A8).
+    function invariant_claimedStaysClaimed() public view {
+        uint256[] memory ids = handler.getTrackedRequestIds();
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (handler.wasPreviouslyClaimed(ids[i])) {
+                (, , , , bool claimed) = vault.withdrawRequests(ids[i]);
+                assertTrue(
+                    claimed,
+                    "once claimed, a request must remain claimed"
+                );
+            }
+        }
+    }
+
+    /// @notice NAV initialization flag is monotonic false→true.
+    /// @dev Formal: ∀ states s_i, s_{i+1}: navInitialized(s_i) == true →
+    ///              navInitialized(s_{i+1}) == true.
+    /// Protects: H4 first-report footgun — once the sanity guard activates
+    ///           it cannot be reset. A compromised operator cannot escape
+    ///           the 10% bound by flipping the init flag.
+    function invariant_navInitMonotonic() public view {
+        // Once seen true, must stay true forever.
+        if (handler.ghost_navInitializedEverTrue()) {
+            assertTrue(
+                vault.navInitialized(),
+                "navInitialized must not regress from true to false"
+            );
+        }
+    }
+
+    /// @notice Access role assignments: operator and guardian never silently
+    ///         acquire DEFAULT_ADMIN_ROLE.
+    /// @dev Formal: ∀ s, ¬hasRole(DEFAULT_ADMIN_ROLE, operator(s))
+    ///             ∧ ¬hasRole(DEFAULT_ADMIN_ROLE, guardian(s))
+    /// Protects: A9 — role escalation via grantRole is blocked because no
+    ///           address ever holds the admin role.
+    function invariant_noAdminRole() public view {
+        bytes32 admin = 0x00; // DEFAULT_ADMIN_ROLE
+        assertFalse(
+            vault.hasRole(admin, vault.operator()),
+            "operator must never hold DEFAULT_ADMIN_ROLE"
+        );
+        assertFalse(
+            vault.hasRole(admin, vault.guardian()),
+            "guardian must never hold DEFAULT_ADMIN_ROLE"
         );
     }
 }

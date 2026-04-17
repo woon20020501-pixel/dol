@@ -32,11 +32,11 @@ import { isValidAddress } from "./guards";
 
 // Dol contract fallback addresses (Base Sepolia, 2026-04-14)
 // Primary source is shared/contracts.json — these only trigger if JSON
-// is missing or the fields are absent. Updated to match the contracts'
+// is missing or the fields are absent. Updated to match the contracts's
 // Dol rename redeploy (commit 7c54f94). pBondSenior key is retained
 // in JSON for pipeline compatibility, but the value is the new Dol
 // contract address. pBondJunior is inactive in Phase 1 (juniorContract
-// set to 0x0 on the new Dol); kept as placeholder.
+// set to 0x0 on the new Dol); kept as conservative default.
 const PBOND_SENIOR_FALLBACK: Address = "0x9E6Cc40CC68Ef1bf46Fcab5574E10771B7566Db4";
 const PBOND_JUNIOR_FALLBACK: Address = "0x08858aDA7F681204BB89a9fA80a3179D3Df567fB";
 const USDC_FALLBACK: Address = "0xEEC3C8bA0d09d86ccbb23f982875C00B716009bD";
@@ -46,7 +46,7 @@ const BASE_SEPOLIA_CHAIN_ID = 84532;
 // doesn't match the below is rejected and the fallback is used. This
 // means a repo attacker can't swap the address to drain user funds —
 // they'd also have to modify this file, which is a second, obvious
-// change that catches code review. When the contracts are redeployed, update
+// change that catches code review. When the contracts redeploys, update
 // both the fallback constant AND this allowlist in the same commit.
 const KNOWN_SENIOR_ADDRESSES: ReadonlySet<string> = new Set([
   PBOND_SENIOR_FALLBACK.toLowerCase(),

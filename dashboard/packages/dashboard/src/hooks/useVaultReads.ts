@@ -80,10 +80,15 @@ export function useVaultReads() {
   }, [refetch]);
 
   if (!contractBase) {
+    // Shape parity with the main return below — consumers destructure
+    // `error` unconditionally, so the fallback branch must expose the
+    // same keys (null-valued) instead of omitting them. Prevents
+    // `vault.error` becoming `undefined` pre-deploy.
     return {
       deployed: false,
       isLoading: false,
       isError: false,
+      error: null,
       totalAssets: null,
       sharePrice: null,
       userShares: null,
@@ -126,7 +131,17 @@ export function useVaultReads() {
   // Treasury balance: real on-chain value if treasuryVault is wired,
   // otherwise derive a synthetic split from the configured allocation
   // so the AllocationBar still tells a story pre-deploy.
-  const allocation = vaultConfig!.allocation;
+  //
+  // Past this point `contractBase` is narrowed non-null by the early
+  // return above, but TS can't correlate that narrowing back to
+  // `vaultConfig` (different binding). Fall back to the default
+  // allocation if vaultConfig somehow became null between checks —
+  // semantically impossible since getVaultConfig() is pure and
+  // idempotent, but the fallback keeps us free of non-null assertions.
+  const allocation = vaultConfig?.allocation ?? {
+    treasuryBps: 3000,
+    marginBps: 7000,
+  };
   let treasuryAssets: number | null = null;
   let marginAssets: number | null = null;
   let treasuryConnected = false;

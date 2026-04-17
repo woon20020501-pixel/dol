@@ -14,7 +14,7 @@ export const metadata = {
 /**
  * Top-level marketing-style FAQ.
  *
- * Distinct from the /docs/faq reference page: this
+ * Distinct from the /docs/faq reference page shipped in : this
  * one is a tabbed, scannable, visitor-facing view modeled on
  * liminal.money/faq. Content is sourced from src/content/faq.md
  * (VP-authored, ~30 questions across 7 categories). Parsing happens

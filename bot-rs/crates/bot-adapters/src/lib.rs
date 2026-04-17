@@ -13,9 +13,13 @@
 //! Tick loop, signal JSON emission, and CLI wiring are deferred to Step B.
 //! Live order signing / submission does NOT exist in this crate.
 
+pub mod chaos;
 pub mod dryrun;
+pub mod execution;
 pub mod pacifica;
 pub mod pacifica_auth;
+pub mod pacifica_sign;
+pub mod rate_limit;
 pub mod venue;
 
 pub use venue::{

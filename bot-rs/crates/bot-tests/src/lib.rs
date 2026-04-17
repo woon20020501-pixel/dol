@@ -50,14 +50,14 @@ pub fn fixtures_dir() -> PathBuf {
     }
 
     // 2. Repo-relative fallback: CARGO_MANIFEST_DIR / ../../../strategy/rust_fixtures
-    //    crates/bot-tests -> bot-rs -> monorepo root
+    //    crates/bot-tests → bot-rs → dol-public (monorepo root)
     //    then strategy/rust_fixtures
     let manifest = std::env::var("CARGO_MANIFEST_DIR")
         .unwrap_or_else(|_| panic!("CARGO_MANIFEST_DIR is not set; run tests via `cargo test`."));
     let p = PathBuf::from(manifest)
         .join("..") // crates
         .join("..") // bot-rs
-        .join("..") // monorepo root
+        .join("..") // dol-public
         .join("strategy")
         .join("rust_fixtures");
 

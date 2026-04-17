@@ -40,7 +40,9 @@ contract pBondJuniorTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0,
+            0
         );
 
         senior = new Dol(vault, IERC20(address(usdc)), guardian);
@@ -352,6 +354,56 @@ contract pBondJuniorTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // C1 FIX: setSeniorContract ACCESS CONTROL
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // v1 bug: setSeniorContract had no caller check. Anyone could front-run
+    //         the deployer's setup tx and set themselves as "senior", then
+    //         call absorbLoss(max) to drain Junior's vault shares.
+    //
+    // Attack test: deploy a fresh Junior (like a new deployment), then have
+    // an attacker front-run the setter. The fix (NotDeployer error) must
+    // block this path.
+
+    /// @notice Attacker cannot front-run setSeniorContract.
+    /// Protects: C1 — permissionless setter vulnerability.
+    function test_c1_setSeniorContract_rejectsNonDeployer() public {
+        pBondJunior freshJunior = new pBondJunior(vault, IERC20(address(usdc)));
+        address attacker = makeAddr("attacker");
+
+        vm.prank(attacker);
+        vm.expectRevert(pBondJunior.NotDeployer.selector);
+        freshJunior.setSeniorContract(attacker);
+    }
+
+    /// @notice Deployer can set senior exactly once.
+    /// Protects: C1 — legitimate setup path still works.
+    function test_c1_setSeniorContract_deployerSucceedsOnce() public {
+        pBondJunior freshJunior = new pBondJunior(vault, IERC20(address(usdc)));
+        address legitSenior = makeAddr("legitSenior");
+
+        // Deployer (this test contract) succeeds
+        freshJunior.setSeniorContract(legitSenior);
+        assertEq(freshJunior.seniorContract(), legitSenior);
+
+        // Second call reverts with existing "already set" error
+        vm.expectRevert(pBondJunior.SeniorAlreadySet.selector);
+        freshJunior.setSeniorContract(address(senior));
+    }
+
+    /// @notice After deployer sets senior, even deployer cannot re-set.
+    /// Protects: C1 — post-setup, senior is effectively immutable.
+    function test_c1_setSeniorContract_deployerBlockedAfterSet() public {
+        pBondJunior freshJunior = new pBondJunior(vault, IERC20(address(usdc)));
+        address legitSenior = makeAddr("legitSenior");
+        freshJunior.setSeniorContract(legitSenior);
+
+        // Even the deployer cannot rotate after initial set
+        vm.expectRevert(pBondJunior.SeniorAlreadySet.selector);
+        freshJunior.setSeniorContract(address(0xdead));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // EXTRA: JUNIOR REDEEM GUARDS
     // ═══════════════════════════════════════════════════════════════════
 
@@ -370,6 +422,70 @@ contract pBondJuniorTest is Test {
         vm.prank(alice);
         vm.expectRevert(pBondJunior.ZeroAmount.selector);
         junior.deposit(0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // COVERAGE-GAP TESTS (2026-04-17 hardening)
+    //
+    // Branch-coverage targets for pBondJunior: redeem zero, claim-not-owner,
+    // claim-double, empty-state pricePerShare.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Junior redeem with zero amount reverts with ZeroAmount.
+    /// Branch: pBondJunior.sol:119
+    function test_junior_redeem_zero_reverts() public {
+        vm.prank(alice);
+        junior.deposit(100e6);
+
+        vm.prank(alice);
+        vm.expectRevert(pBondJunior.ZeroAmount.selector);
+        junior.redeem(0);
+    }
+
+    /// @notice claimRedeem from non-owner reverts with NotRedeemOwner.
+    /// Branch: pBondJunior.sol:144
+    function test_junior_claimRedeem_notOwner_reverts() public {
+        vm.prank(alice);
+        junior.deposit(1000e6);
+        vm.prank(alice);
+        uint256 redeemId = junior.redeem(1000e6);
+        vm.warp(block.timestamp + COOLDOWN + 1);
+
+        // Bob attempts to claim alice's redeem
+        vm.prank(bob);
+        vm.expectRevert(pBondJunior.NotRedeemOwner.selector);
+        junior.claimRedeem(redeemId);
+    }
+
+    /// @notice Double-claim on Junior reverts with AlreadyClaimed.
+    /// Branch: pBondJunior.sol:145
+    function test_junior_claimRedeem_doubleClaim_reverts() public {
+        vm.prank(alice);
+        junior.deposit(1000e6);
+        vm.prank(alice);
+        uint256 redeemId = junior.redeem(1000e6);
+        vm.warp(block.timestamp + COOLDOWN + 1);
+
+        vm.prank(alice);
+        junior.claimRedeem(redeemId);
+
+        // Second attempt
+        vm.prank(alice);
+        vm.expectRevert(pBondJunior.AlreadyClaimed.selector);
+        junior.claimRedeem(redeemId);
+    }
+
+    /// @notice pricePerShare returns 1e6 when Junior totalSupply is 0.
+    /// Branch: pBondJunior.sol:189
+    function test_junior_pricePerShare_emptyState() public view {
+        // No Junior deposits in setUp
+        assertEq(junior.totalSupply(), 0, "Junior supply should be 0");
+        assertEq(junior.pricePerShare(), 1e6, "empty Junior price is 1:1");
+    }
+
+    /// @notice pBondJunior uses 6 decimals to match USDC.
+    function test_junior_decimals_is6() public view {
+        assertEq(junior.decimals(), 6, "pBJ decimals must be 6");
     }
 
     // ═══════════════════════════════════════════════════════════════════

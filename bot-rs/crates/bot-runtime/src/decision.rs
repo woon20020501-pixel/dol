@@ -27,7 +27,7 @@
 //! rates jitter on ~1 pp timescales. A relative-hysteresis gate becomes
 //! ineffective when the held pair's current spread degrades — the
 //! threshold shrinks with it and churn restarts. The explicit
-//! no-rebalance policy is documented in `docs/v0-punchlist.md` T3-29 as
+//! no-rebalance policy is documented in the spec T3-29 as
 //! a pre-Tier-1-live cleanup item; production will use
 //! `funding_cycle_lock` + `forecast_scoring` + `fsm_controller` +
 //! `cvar_guard` to drive rebalance decisions on meaningful signals.

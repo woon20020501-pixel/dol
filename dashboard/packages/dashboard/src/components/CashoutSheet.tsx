@@ -38,7 +38,7 @@ interface CashoutSheetProps {
    * than the REQUESTED amount. Rendered as a *transient* "temporarily
    * unavailable" state rather than a hard disable, because the buffer
    * can refill at any moment and the next user tap might work. See
-   * See the cash-out design doc for context.
+   *  for context.
    */
   instantBufferShort?: boolean;
 }

@@ -16,6 +16,7 @@ use bot_adapters::venue::VenueAdapter;
 use bot_runtime::adapter_health::AdapterHealthRegistry;
 use bot_runtime::cycle_lock::CycleLockRegistry;
 use bot_runtime::nav::NavTracker;
+use bot_runtime::risk::RiskStack;
 use bot_runtime::tick::TickEngine;
 use bot_types::Venue;
 
@@ -32,6 +33,8 @@ async fn pacifica_live_one_tick_btc() {
     let mut nav = NavTracker::new(10_000.0);
     let mut cycle_locks = CycleLockRegistry::new();
     let mut adapter_health = AdapterHealthRegistry::new();
+    let mut risk_stack = RiskStack::new(10_000.0);
+    let mut history = bot_runtime::history::FundingHistoryRegistry::new();
 
     let now_ms = chrono::Utc::now().timestamp_millis();
     let output = engine
@@ -40,6 +43,8 @@ async fn pacifica_live_one_tick_btc() {
             &mut nav,
             &mut cycle_locks,
             &mut adapter_health,
+            &mut risk_stack,
+            &mut history,
             now_ms,
             0.0,
         )

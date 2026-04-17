@@ -10,6 +10,12 @@ import {
 } from "wagmi";
 import { parseUnits, decodeEventLog } from "viem";
 import { getVaultConfig, VAULT_ABI } from "@/lib/vault";
+import {
+  pickRevertedHash,
+  anyReverted,
+  mergeTxError,
+  isRevertError,
+} from "@/lib/txState";
 
 const SHARE_DECIMALS = 6;
 const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -79,11 +85,17 @@ export function useWithdraw() {
     reset: resetRequest,
   } = useWriteContract();
 
+  // Gate raw receipt-query isError through isRevertError so RPC
+  // hiccups don't get labelled as "Reverted on-chain" in the UI.
   const {
     data: requestReceipt,
     isLoading: isRequestConfirming,
     isSuccess: isRequestConfirmed,
+    isError: hasRequestReceiptError,
+    error: requestReceiptError,
   } = useWaitForTransactionReceipt({ hash: requestHash });
+  const isRequestReverted =
+    hasRequestReceiptError && isRevertError(requestReceiptError);
 
   // Parse WithdrawRequested event from receipt and track it
   useEffect(() => {
@@ -135,7 +147,11 @@ export function useWithdraw() {
   const {
     isLoading: isClaimConfirming,
     isSuccess: isClaimConfirmed,
+    isError: hasClaimReceiptError,
+    error: claimReceiptError,
   } = useWaitForTransactionReceipt({ hash: claimHash });
+  const isClaimReverted =
+    hasClaimReceiptError && isRevertError(claimReceiptError);
 
   // Remove claimed request from pending list
   useEffect(() => {
@@ -202,12 +218,24 @@ export function useWithdraw() {
   const isRequesting = isRequestPending || isRequestConfirming;
   const isClaiming = isClaimPending || isClaimConfirming;
 
-  const requestErrorMsg = requestError
-    ? (requestError as Error).message?.split("\n")[0] ?? "Request failed"
+  // Promote the first-line of writeContract errors OR the revert reason
+  // from receipt errors (wagmi core 2.22.1 throws with reason string).
+  const requestErrorSource = mergeTxError(requestError, requestReceiptError);
+  const claimErrorSource = mergeTxError(claimError, claimReceiptError);
+  const requestErrorMsg = requestErrorSource
+    ? (requestErrorSource as Error).message?.split("\n")[0] ?? "Request failed"
     : null;
-  const claimErrorMsg = claimError
-    ? (claimError as Error).message?.split("\n")[0] ?? "Claim failed"
+  const claimErrorMsg = claimErrorSource
+    ? (claimErrorSource as Error).message?.split("\n")[0] ?? "Claim failed"
     : null;
+
+  // Revert-specific fields for UI basescan deep-link.
+  const revertFlows = [
+    { isReverted: isRequestReverted, hash: requestHash },
+    { isReverted: isClaimReverted, hash: claimHash },
+  ];
+  const revertedHash = pickRevertedHash(revertFlows);
+  const isReverted = anyReverted(revertFlows);
 
   return {
     // State
@@ -219,15 +247,20 @@ export function useWithdraw() {
     isRequesting,
     isRequestConfirmed,
     requestError: requestErrorMsg,
+    requestHash,
     requestWithdraw,
     // Claim
     isClaiming,
     isClaimConfirmed,
     claimingId,
     claimError: claimErrorMsg,
+    claimHash,
     claimWithdraw,
     isClaimable,
     cooldownRemaining,
+    // Reverted-tx affordance
+    isReverted,
+    revertedHash,
     // Pending
     pendingRequests,
     // Util

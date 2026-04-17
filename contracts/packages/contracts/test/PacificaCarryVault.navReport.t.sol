@@ -9,9 +9,9 @@ import {MockUSDC} from "./PacificaCarryVault.t.sol";
 
 /// @title PacificaCarryVaultNavReportTest
 /// @notice End-to-end integration tests that exercise the NAV-report signing
-///         flow exactly the way the off-chain bot does. Each test constructs
-///         the signing payload from raw fields, hashes with the EIP-191
-///         prefix, signs with a known operator private key, and submits via
+///         flow exactly the way the bot's bot will. Each test constructs the
+///         signing payload from raw fields, hashes with the EIP-191 prefix,
+///         signs with a known operator private key, and submits via
 ///         `reportNAV`. These tests serve as the reference the bot mirrors —
 ///         if any test in this file breaks, the bot's signer is also broken.
 contract PacificaCarryVaultNavReportTest is Test {
@@ -42,7 +42,9 @@ contract PacificaCarryVaultNavReportTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0,
+            0
         );
 
         // Seed the vault so totalAssetsStored has a baseline for the
@@ -60,7 +62,7 @@ contract PacificaCarryVaultNavReportTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     /// @notice Operator signs a valid NAV update; vault accepts and updates state.
-    /// Protects: the full signing flow the bot runs — payload encoding,
+    /// Protects: the full signing flow the bot will run — payload encoding,
     ///           EIP-191 prefix, ECDSA signing, contract recovery — must
     ///           round-trip without any byte-level discrepancy.
     function test_reportNAV_validSignature_succeeds() public {
@@ -194,10 +196,10 @@ contract PacificaCarryVaultNavReportTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // GOLDEN VECTOR — REFERENCE BYTES FOR THE OFF-CHAIN SIGNER
+    // GOLDEN VECTOR — REFERENCE BYTES FOR AGENT B TO MIRROR
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Emits a deterministic golden vector to stdout. The off-chain
+    /// @notice Emits a deterministic golden vector to stdout. the bot's
     ///         signer must produce byte-for-byte identical output for the
     ///         same inputs. Run with `forge test --match-test test_goldenVector_emit -vv`
     ///         to see the values logged.
@@ -252,8 +254,208 @@ contract PacificaCarryVaultNavReportTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // C4 RATE-LIMIT TESTS (2026-04-17)
+    //
+    // Parameter basis: MakerDAO OSM `hop = 3600s`, Chainlink BTC/USD
+    // heartbeat 3600s, Lido OracleReportSanityChecker daily cap pattern.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Rate-limited vault rejects a second report within the
+    ///         `minReportInterval` window.
+    /// Protects: C4 — post-compromise compounded drift via chained
+    ///           reports is bounded by the interval.
+    function test_c4_minInterval_rejectsFastFollowup() public {
+        // Fresh vault with production-grade rate limit (3600s = Chainlink/OSM)
+        PacificaCarryVault limitedVault = new PacificaCarryVault(
+            IERC20(address(usdc)), treasury, operator, guardian, COOLDOWN, guardian,
+            3600, // minReportInterval
+            0 // no daily cap (isolate the interval check)
+        );
+        usdc.mint(alice, SEED_DEPOSIT);
+        vm.prank(alice);
+        usdc.approve(address(limitedVault), type(uint256).max);
+        vm.prank(alice);
+        limitedVault.deposit(SEED_DEPOSIT, alice);
+
+        // Use absolute timestamps anchored to a fixed base so the sequence
+        // is unambiguous regardless of Foundry's block-timestamp default.
+        uint256 BASE = 1_000_000_000;
+
+        // First report at BASE establishes baseline
+        vm.warp(BASE);
+        limitedVault.reportNAV(100e6, BASE, _signNavFor(limitedVault, 100e6, BASE));
+        assertEq(limitedVault.lastTimestamp(), BASE, "first report recorded");
+
+        // Second report 1 second later (inside 3600s interval) → revert
+        vm.warp(BASE + 1);
+        bytes memory sig2 = _signNavFor(limitedVault, 101e6, BASE + 1);
+        vm.expectRevert(PacificaCarryVault.NavReportTooFrequent.selector);
+        limitedVault.reportNAV(101e6, BASE + 1, sig2);
+
+        // At exactly BASE + 3599 → still revert (strict < boundary)
+        vm.warp(BASE + 3599);
+        bytes memory sig3 = _signNavFor(limitedVault, 101e6, BASE + 3599);
+        vm.expectRevert(PacificaCarryVault.NavReportTooFrequent.selector);
+        limitedVault.reportNAV(101e6, BASE + 3599, sig3);
+
+        // At exactly BASE + 3600 → accepted (boundary)
+        vm.warp(BASE + 3600);
+        limitedVault.reportNAV(
+            101e6, BASE + 3600, _signNavFor(limitedVault, 101e6, BASE + 3600)
+        );
+        assertEq(limitedVault.totalAssetsStored(), 101e6, "C4: boundary report accepted");
+    }
+
+    /// @notice Daily cumulative delta cap rejects reports that would push
+    ///         the UTC-day sum over the threshold.
+    /// Protects: C4 — cumulative drift over many reports capped in bps/day.
+    function test_c4_dailyCap_rejectsExcess() public {
+        // Production-style limit: 100 bps/day cap (Lido-style), no min interval
+        // so we can test the daily cap in isolation
+        PacificaCarryVault cappedVault = new PacificaCarryVault(
+            IERC20(address(usdc)), treasury, operator, guardian, COOLDOWN, guardian,
+            0,   // no min interval (isolate daily cap)
+            100  // 100 bps/day
+        );
+        usdc.mint(alice, SEED_DEPOSIT);
+        vm.prank(alice);
+        usdc.approve(address(cappedVault), type(uint256).max);
+        vm.prank(alice);
+        cappedVault.deposit(SEED_DEPOSIT, alice);
+
+        // First report: baseline 100_000e6 (1% over daily cap at 100 USDC for Alice's
+        // deposit, but baseline is 100k pure oracle slot — daily cap applies to
+        // subsequent deltas against this baseline).
+        uint256 ts0 = block.timestamp + 1;
+        vm.warp(ts0);
+        cappedVault.reportNAV(100_000e6, ts0, _signNavFor(cappedVault, 100_000e6, ts0));
+
+        // Second report +50 bps (0.5%) → under cap → accepted
+        uint256 nav1 = 100_500e6; // +0.5%
+        uint256 ts1 = ts0 + 1;
+        vm.warp(ts1);
+        cappedVault.reportNAV(nav1, ts1, _signNavFor(cappedVault, nav1, ts1));
+        assertEq(cappedVault.totalAssetsStored(), nav1, "C4.1: 0.5% accepted");
+
+        // Third report +40 bps more (cumulative 90 bps same day) → still under
+        uint256 nav2 = 100_900e6;
+        uint256 ts2 = ts1 + 1;
+        vm.warp(ts2);
+        cappedVault.reportNAV(nav2, ts2, _signNavFor(cappedVault, nav2, ts2));
+        assertEq(cappedVault.totalAssetsStored(), nav2, "C4.2: cumulative 0.9% accepted");
+
+        // Fourth report +20 bps more (would reach 110 bps cumulative) → revert
+        uint256 nav3 = 101_100e6;
+        uint256 ts3 = ts2 + 1;
+        vm.warp(ts3);
+        bytes memory sig3 = _signNavFor(cappedVault, nav3, ts3);
+        vm.expectRevert(PacificaCarryVault.NavDailyDeltaExceeded.selector);
+        cappedVault.reportNAV(nav3, ts3, sig3);
+
+        // Next-day bucket resets the counter
+        uint256 ts4 = ts3 + 1 days;
+        vm.warp(ts4);
+        cappedVault.reportNAV(nav3, ts4, _signNavFor(cappedVault, nav3, ts4));
+        assertEq(cappedVault.totalAssetsStored(), nav3, "C4.3: next-day resets counter");
+    }
+
+    /// @notice Daily-cap strict `>` boundary check on the CURRENT `lastNav`.
+    /// @dev Cap is expressed as `newDaySum * 10_000 > lastNav * maxBps`.
+    ///      With `lastNav = 100_000e6` (baseline) and `maxBps = 100` (1%),
+    ///      `newDaySum > 100_000e6 * 100 / 10_000 = 1_000e6` fires the revert.
+    ///      Since `lastNav` refreshes after each accepted report, this test
+    ///      fixes the baseline snapshot and verifies:
+    ///        (a) a single report that adds exactly 1_000e6 delta → accepted
+    ///            (sum = 1_000e6, not > cap 1_000e6 against baseline)
+    ///        (b) a subsequent report that would push sum beyond the NEW
+    ///            lastNav's cap → reverts
+    ///      Accepts the documented "drifting denominator" semantics; a
+    ///      tighter cap would require storing the snapshot baseline per day.
+    function test_c4_dailyCap_exactBoundary() public {
+        PacificaCarryVault v = new PacificaCarryVault(
+            IERC20(address(usdc)), treasury, operator, guardian, COOLDOWN, guardian,
+            0, 100 // 100 bps daily cap
+        );
+        usdc.mint(alice, SEED_DEPOSIT);
+        vm.prank(alice);
+        usdc.approve(address(v), type(uint256).max);
+        vm.prank(alice);
+        v.deposit(SEED_DEPOSIT, alice);
+
+        uint256 ts0 = 1_000_000_000;
+        vm.warp(ts0);
+        v.reportNAV(100_000e6, ts0, _signNavFor(v, 100_000e6, ts0));
+
+        // Exactly +1_000e6 delta (100 bps of the 100_000e6 baseline)
+        uint256 ts1 = ts0 + 1;
+        vm.warp(ts1);
+        uint256 nav1 = 101_000e6;
+        v.reportNAV(nav1, ts1, _signNavFor(v, nav1, ts1));
+        assertEq(v.totalAssetsStored(), nav1, "C4.boundary.a: exactly 100 bps accepted");
+
+        // Second report with large enough delta to push cumulative beyond
+        // the NEW lastNav's 1% bound. lastNav is now 101_000e6; daily cap
+        // absolute = 101_000e6 * 100 / 10_000 = 1_010e6. Sum already 1_000e6.
+        // A delta > 10e6 would push sum > 1_010e6 → revert.
+        uint256 ts2 = ts1 + 1;
+        vm.warp(ts2);
+        uint256 nav2 = 101_000e6 + 11e6; // +11e6 delta pushes sum to 1_011e6
+        bytes memory sig2 = _signNavFor(v, nav2, ts2);
+        vm.expectRevert(PacificaCarryVault.NavDailyDeltaExceeded.selector);
+        v.reportNAV(nav2, ts2, sig2);
+
+        // But exactly at the boundary (+10e6 → sum = 1_010e6) is accepted
+        uint256 nav3 = 101_000e6 + 10e6;
+        v.reportNAV(nav3, ts2, _signNavFor(v, nav3, ts2));
+        assertEq(
+            v.totalAssetsStored(),
+            nav3,
+            "C4.boundary.b: exactly-at-cap accepted"
+        );
+    }
+
+    /// @notice View: dailyDeltaConsumed reports the accumulator.
+    function test_c4_dailyDeltaConsumed_view() public {
+        PacificaCarryVault cappedVault = new PacificaCarryVault(
+            IERC20(address(usdc)), treasury, operator, guardian, COOLDOWN, guardian,
+            0, 100
+        );
+        uint256 ts0 = block.timestamp + 1;
+        vm.warp(ts0);
+        cappedVault.reportNAV(100_000e6, ts0, _signNavFor(cappedVault, 100_000e6, ts0));
+        uint256 day = ts0 / 1 days;
+        assertEq(cappedVault.dailyDeltaConsumed(day), 0, "C4.4: baseline report adds 0");
+
+        uint256 ts1 = ts0 + 1;
+        vm.warp(ts1);
+        cappedVault.reportNAV(100_500e6, ts1, _signNavFor(cappedVault, 100_500e6, ts1));
+        uint256 day1 = ts1 / 1 days;
+        assertEq(
+            cappedVault.dailyDeltaConsumed(day1),
+            500e6,
+            "C4.5: 0.5% delta tracked"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // HELPERS
     // ═══════════════════════════════════════════════════════════════════
+
+    /// @dev Sign for an arbitrary vault address (for multi-vault tests).
+    function _signNavFor(PacificaCarryVault v, uint256 newNav, uint256 timestamp)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        bytes32 payloadHash = keccak256(
+            abi.encodePacked("PACIFICA_CARRY_VAULT_NAV", address(v), newNav, timestamp)
+        );
+        bytes32 ethSignedHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", payloadHash)
+        );
+        (uint8 v_, bytes32 r, bytes32 s) = vm.sign(OPERATOR_PK, ethSignedHash);
+        return abi.encodePacked(r, s, v_);
+    }
 
     /// @dev Mirrors the bot's signer. Must stay byte-identical to
     ///      INTERFACES.md §3 and the worked example in test_goldenVector_emit.

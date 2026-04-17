@@ -208,17 +208,17 @@ impl PacificaAuthenticatedAdapter {
     /// `PACIFICA_BUILDER_CODE`.
     ///
     /// Fails with a descriptive error if either variable is missing or empty.
-    /// See `docs/v0-punchlist.md` for setup instructions.
+    ///
     pub fn from_env() -> Result<Self, AdapterError> {
         let api_key = std::env::var(ENV_API_KEY).map_err(|_| {
             AdapterError::Parse(format!(
-                "{ENV_API_KEY} is not set. See docs/v0-punchlist.md for setup instructions."
+                "{ENV_API_KEY} is not set."
             ))
         })?;
 
         let builder_code = std::env::var(ENV_BUILDER_CODE).map_err(|_| {
             AdapterError::Parse(format!(
-                "{ENV_BUILDER_CODE} is not set. See docs/v0-punchlist.md for setup instructions."
+                "{ENV_BUILDER_CODE} is not set."
             ))
         })?;
 

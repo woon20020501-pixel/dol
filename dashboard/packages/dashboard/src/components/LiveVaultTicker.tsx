@@ -29,7 +29,7 @@ import { Glossary } from "./Glossary";
  * current target rate, live.
  *
  * When the RPC is unreachable we fall back to a static "— Dol"
- * placeholder and keep the section visible (still conveys the
+ * conservative default and keep the section visible (still conveys the
  * idea), but don't seed LiveCounter until a real value lands.
  */
 

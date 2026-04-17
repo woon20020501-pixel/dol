@@ -6,6 +6,10 @@ import type { Metadata } from "next";
  * for a user arriving at the deposit page from a share link or CTA,
  * distinct from the hero landing.
  */
+// openGraph.images / twitter.images intentionally OMITTED so this
+// route inherits the root's dynamic opengraph-image.tsx (lean 1200x630
+// PNG) instead of the 4.3 MB static /images/dol.png which was making
+// Twitter/Slack/Discord previews slow to render.
 export const metadata: Metadata = {
   title: "Buy your first Dol",
   description:
@@ -14,7 +18,6 @@ export const metadata: Metadata = {
     title: "Buy your first Dol · Dol",
     description:
       "Get your first Dol in under a minute. 1 Dol = 1 USDC, backed on-chain, redeemable anytime.",
-    images: ["/images/dol.png"],
     type: "website",
     siteName: "Dol",
   },
@@ -23,7 +26,6 @@ export const metadata: Metadata = {
     title: "Buy your first Dol · Dol",
     description:
       "Get your first Dol in under a minute. 1 Dol = 1 USDC, backed on-chain, redeemable anytime.",
-    images: ["/images/dol.png"],
   },
   robots: {
     index: false,

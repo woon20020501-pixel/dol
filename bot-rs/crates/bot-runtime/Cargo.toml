@@ -22,10 +22,12 @@ tracing-subscriber = { workspace = true }
 chrono        = { workspace = true }
 anyhow        = { workspace = true }
 futures-util  = { workspace = true }
+axum         = { version = "0.7", default-features = false, features = ["http1", "tokio"] }
 
 [dev-dependencies]
 tokio         = { workspace = true, features = ["full", "test-util"] }
 tempfile      = "3"
+reqwest       = { workspace = true }
 criterion     = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]

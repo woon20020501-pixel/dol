@@ -21,7 +21,7 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
 
 /**
  * Aurora-Ω Operate Console — the "alive" Week-1 demo layer on top of the
- * existing operator dashboard. Visualizes the Rust bot telemetry:
+ * existing operator dashboard. Visualizes the bot's Rust bot telemetry:
  *
  *   - NAV pulse curve (entry cost step-down → slow accrual climb to breakeven)
  *   - Venue health grid (Pacifica live, other 3 Week-1 fixtures)
@@ -32,7 +32,7 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
  *   - v0 mode badge (which framework layers are intentionally stubbed)
  *
  * Data source: client-side deterministic simulator seeded from the bot's
- * authoritative numbers. When the Rust bot's `output/nav.jsonl`
+ *  authoritative numbers. When the Rust bot's `output/nav.jsonl`
  * stream is live, swap the hook's inner source — UI stays the same.
  */
 export function AuroraConsole() {

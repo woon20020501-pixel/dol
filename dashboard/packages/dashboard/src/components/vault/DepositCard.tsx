@@ -185,15 +185,22 @@ export function DepositCard() {
             >
               Amount
             </label>
-            {authenticated && dep.usdcBalance !== null && (
-              <button
-                type="button"
-                onClick={() => setAmount(dep.usdcBalance!.toString())}
-                className="text-[11px] text-senior hover:text-senior-dark transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
-              >
-                BAL: {formatUsd(dep.usdcBalance)}
-              </button>
-            )}
+            {authenticated && dep.usdcBalance !== null && (() => {
+              // Capture usdcBalance in a local const so TS narrows it
+              // to `number` inside the onClick closure without needing
+              // a non-null assertion. Without this, the closure reads
+              // the prop again at click time and TS widens it back.
+              const bal = dep.usdcBalance;
+              return (
+                <button
+                  type="button"
+                  onClick={() => setAmount(bal.toString())}
+                  className="text-[11px] text-senior hover:text-senior-dark transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
+                >
+                  BAL: {formatUsd(bal)}
+                </button>
+              );
+            })()}
           </div>
           <div className="relative mt-1">
             <input
@@ -251,18 +258,65 @@ export function DepositCard() {
           </p>
         )}
 
+        {/* Pre-flight gas warning. Fires if the user's Base Sepolia ETH
+            balance is below LOW_GAS_ETH (0.0005 ETH ≈ enough for 2
+            standard txs with a 50× gas spike). Much better than
+            watching MetaMask reject with "insufficient funds for gas"
+            after the user already clicked Approve. */}
+        {authenticated && dep.hasLowGas && (
+          <div
+            role="status"
+            className="flex items-start gap-1.5 rounded-xl border border-carry-amber/30 bg-carry-amber/10 px-3 py-2 text-[11px] text-carry-amber"
+          >
+            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+            <div>
+              <p>
+                Low ETH for gas ({dep.ethBalance?.toFixed(5)} ETH). Approve
+                and deposit both need a little more.
+              </p>
+              <a
+                href="https://www.alchemy.com/faucets/base-sepolia"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-block underline transition-opacity hover:no-underline"
+              >
+                Get test ETH &rarr;
+              </a>
+            </div>
+          </div>
+        )}
+
         {errorMsg && (
           <div role="alert" className="flex items-start gap-1.5 rounded-xl bg-carry-red/10 border border-carry-red/20 px-3 py-2 text-[11px] text-carry-red">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-            <div>
-              <p className="line-clamp-2">{errorMsg}</p>
-              <button
-                type="button"
-                onClick={dep.reset}
-                className="mt-1 underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
-              >
-                Try again
-              </button>
+            <div className="flex-1">
+              {dep.isReverted ? (
+                <>
+                  <p className="font-medium">Reverted on-chain</p>
+                  <p className="line-clamp-2 mt-0.5 text-dark-secondary">{errorMsg}</p>
+                </>
+              ) : (
+                <p className="line-clamp-2">{errorMsg}</p>
+              )}
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={dep.reset}
+                  className="underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
+                >
+                  Try again
+                </button>
+                {dep.revertedHash && (
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${dep.revertedHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
+                  >
+                    View tx &rarr;
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}

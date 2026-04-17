@@ -14,7 +14,7 @@
 //! with header `X-API-Key`. This is consistent with the public endpoint used
 //! by `PacificaRest::get_balance`. The adapter falls back to `/account/info`
 //! and `/user` if the primary returns 404. If all three fail, the test will
-//! surface the HTTP status so the correct path can be determined.
+//! surface the HTTP status
 //!
 //! The builder endpoint is `GET /api/v1/builder/program?builder_code=<code>`.
 //! If this path is wrong, the test will print the HTTP status.

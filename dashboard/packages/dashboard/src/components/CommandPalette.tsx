@@ -21,8 +21,8 @@ import { Search } from "lucide-react";
  * The filter is a straightforward substring search across command
  * labels; rank ties are broken by insertion order.
  *
- * This is the "optional tier" from Phase 2.5, shipped as part
- * of the consolidated trim commit.
+ * This is the "optional tier" from  Phase 2.5, shipped as part
+ * of the  consolidated trim commit.
  */
 
 type Command = {
@@ -202,17 +202,29 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
+    // Overlay is presentational (pure visual dim + click-to-dismiss
+    // target). The interactive dialog role lives on the inner panel
+    // below, which owns the keyboard handling. Splitting these roles
+    // satisfies jsx-a11y/no-noninteractive-element-interactions —
+    // dialogs are "non-interactive" in the plugin's ontology, so the
+    // keyboard listener must sit on the inner focus-receiving panel.
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command menu"
       className="fixed inset-0 z-[120] flex items-start justify-center bg-black/80 p-4 pt-[14vh] backdrop-blur"
       onClick={() => setOpen(false)}
-      onKeyDown={onDialogKey}
+      aria-hidden="true"
     >
+      {/* onClick stop-propagation is a pointer-only concern (prevent
+          overlay dismiss when clicking inside). Keyboard users get
+          Escape/Arrow/Enter via onKeyDown, so no keyboard-parity gap. */}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command menu"
+        tabIndex={-1}
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={onDialogKey}
         style={{ boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}
       >
         <div className="flex items-center gap-3 border-b border-white/5 px-5 py-4">

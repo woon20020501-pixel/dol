@@ -12,3 +12,4 @@ serde = { workspace = true }
 
 [dev-dependencies]
 hashbrown = { workspace = true }
+proptest  = "1"

@@ -39,7 +39,9 @@ contract DolTest is Test {
             operator,
             guardian,
             COOLDOWN,
-            guardian
+            guardian,
+            0, // minReportInterval disabled
+            0 // maxDailyDeltaBps disabled
         );
 
         senior = new Dol(vault, IERC20(address(usdc)), guardian);
@@ -414,5 +416,84 @@ contract DolTest is Test {
         );
         assertEq(senior.balanceOf(alice), 500e6, "DOL half burned");
         assertEq(senior.totalDeposited(), 500e6, "principal halved");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // COVERAGE-GAP TESTS (2026-04-17 hardening)
+    //
+    // Targeted tests for branches that lcov flagged as unhit. Each test
+    // exercises one specific conditional path. Purpose: push branch
+    // coverage from 66.67% toward 95%+.
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice instantRedeem with zero dolAmount reverts with ZeroAmount.
+    /// Branch: Dol.sol:163
+    function test_instantRedeem_zeroAmount_reverts() public {
+        vm.prank(alice);
+        vm.expectRevert(Dol.ZeroAmount.selector);
+        senior.instantRedeem(0);
+    }
+
+    /// @notice instantRedeem with insufficient balance reverts.
+    /// Branch: Dol.sol:164
+    function test_instantRedeem_insufficientBalance_reverts() public {
+        // Alice deposits 100 but tries to redeem 200
+        vm.prank(alice);
+        senior.deposit(100e6);
+
+        vm.prank(alice);
+        vm.expectRevert(Dol.InsufficientBalance.selector);
+        senior.instantRedeem(200e6);
+    }
+
+    /// @notice distributeYield reverts with JuniorNotSet when junior is unset.
+    /// Branch: Dol.sol:199 — Phase 1 default state.
+    function test_distributeYield_juniorNotSet_reverts() public {
+        // Fresh Dol without setJuniorContract call
+        Dol freshSenior = new Dol(vault, IERC20(address(usdc)), guardian);
+        vm.expectRevert(Dol.JuniorNotSet.selector);
+        freshSenior.distributeYield();
+    }
+
+    /// @notice distributeYield returns cleanly when elapsed == 0 (same block).
+    /// Branch: Dol.sol:204 — called twice in same block, second is no-op.
+    /// @dev setUp() already links senior<->junior, so we re-use it.
+    function test_distributeYield_elapsedZero_noOp() public {
+        // Alice deposits so senior holds vault shares
+        vm.prank(alice);
+        senior.deposit(100e6);
+
+        // First call establishes lastDistributionTimestamp == block.timestamp
+        senior.distributeYield();
+
+        // Second call in the same block has elapsed == 0 → early return.
+        // Must not revert.
+        senior.distributeYield();
+    }
+
+    /// @notice distributeYield returns cleanly when senior holds 0 vault shares.
+    /// Branch: Dol.sol:208 — no senior deposits yet.
+    function test_distributeYield_seniorEmpty_noOp() public {
+        // setUp() already links senior<->junior, but nobody deposited into senior
+        // Advance time so elapsed > 0
+        vm.warp(block.timestamp + 1 days);
+
+        // senior has 0 vault shares → early return branch
+        senior.distributeYield();
+    }
+
+    /// @notice pricePerShare returns 1e6 when totalSupply is 0.
+    /// Branch: Dol.sol:259 — empty-state initial price.
+    function test_pricePerShare_emptyState_returns1e6() public view {
+        // No deposits yet → supply == 0
+        assertEq(senior.totalSupply(), 0, "supply should be 0");
+        assertEq(senior.pricePerShare(), 1e6, "empty-state price is 1:1");
+    }
+
+    /// @notice Dol uses 6 decimals to match USDC.
+    /// Protects: external tooling (dashboards, wallets) displays the
+    ///           correct precision.
+    function test_dol_decimals_is6() public view {
+        assertEq(senior.decimals(), 6, "DOL decimals must be 6");
     }
 }

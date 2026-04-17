@@ -28,6 +28,13 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
     error AlreadyClaimed();
     error InsufficientBalance();
     error SeniorAlreadySet();
+    /// @notice Thrown when a non-deployer attempts to call setSeniorContract.
+    /// @dev C1 fix (2026-04-17): v1 had a permissionless setter. Anyone could
+    ///      front-run the deployer's setup tx and plant a malicious senior,
+    ///      then drain Junior's vault shares via absorbLoss(). The deployer
+    ///      is now locked in at construction and is the only address allowed
+    ///      to perform the one-time senior link.
+    error NotDeployer();
 
     // ── Events ─────────────────────────────────────────────────────────
     /// @notice Emitted when a user deposits USDC and receives pBJ tokens.
@@ -51,6 +58,12 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
     /// @notice Cumulative USDC principal deposited (decremented on redeem).
     uint256 public totalDeposited;
 
+    /// @notice Deployer address — the only account permitted to call
+    ///         `setSeniorContract` exactly once. Recorded at construction
+    ///         and never mutated thereafter.
+    /// @dev C1 fix (2026-04-17). Rationale in NotDeployer error NatSpec.
+    address private immutable _deployer;
+
     /// @notice Tracks a pending redemption through the vault's withdraw queue.
     struct RedeemRequest {
         address user;
@@ -67,12 +80,10 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
     /// @notice Deploy the Junior tranche wrapper.
     /// @param _vault Address of the PacificaCarryVault
     /// @param _usdc Address of the USDC token
-    constructor(
-        PacificaCarryVault _vault,
-        IERC20 _usdc
-    ) ERC20("pBond Junior", "pBJ") {
+    constructor(PacificaCarryVault _vault, IERC20 _usdc) ERC20("pBond Junior", "pBJ") {
         vault = _vault;
         usdc = _usdc;
+        _deployer = msg.sender;
     }
 
     /// @notice pBJ uses 6 decimals to match USDC.
@@ -115,11 +126,7 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
 
         uint256 vaultRequestId = vault.requestWithdraw(vaultShares);
         redeemId = nextRedeemId++;
-        redeemRequests[redeemId] = RedeemRequest({
-            user: msg.sender,
-            vaultRequestId: vaultRequestId,
-            claimed: false
-        });
+        redeemRequests[redeemId] = RedeemRequest({user: msg.sender, vaultRequestId: vaultRequestId, claimed: false});
         emit RedeemRequested(msg.sender, pbjAmount, redeemId);
     }
 
@@ -149,10 +156,19 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
     }
 
     /// @notice Set the paired Senior tranche contract. One-time only.
-    /// @dev Called during deployment setup. Only the deployer (before
-    ///      seniorContract is set) or a governance mechanism can call this.
+    /// @dev Called during deployment setup. Only the deployer (address that
+    ///      executed the constructor) may call this, and only once before
+    ///      `seniorContract` is set. Subsequent calls revert with
+    ///      `SeniorAlreadySet` even for the deployer — the link is effectively
+    ///      immutable after the single initial call.
+    /// @custom:security C1 fix (2026-04-17). v1 had a permissionless setter
+    ///      that any actor could front-run to plant a malicious senior and
+    ///      drain Junior via `absorbLoss`. Deployer-gating blocks the
+    ///      front-run vector while preserving the two-step deployment flow
+    ///      (Senior and Junior must reference each other post-construction).
     /// @param _senior Address of the senior tranche contract (Dol in Phase 1)
     function setSeniorContract(address _senior) external {
+        if (msg.sender != _deployer) revert NotDeployer();
         if (seniorContract != address(0)) revert SeniorAlreadySet();
         seniorContract = _senior;
     }
@@ -164,9 +180,7 @@ contract pBondJunior is ERC20, ReentrancyGuard, IPBondJunior {
     function pricePerShare() external view returns (uint256) {
         uint256 supply = totalSupply();
         if (supply == 0) return 1e6;
-        uint256 value = vault.convertToAssets(
-            IERC20(address(vault)).balanceOf(address(this))
-        );
+        uint256 value = vault.convertToAssets(IERC20(address(vault)).balanceOf(address(this)));
         return (value * 1e6) / supply;
     }
 }

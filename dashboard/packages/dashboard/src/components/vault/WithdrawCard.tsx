@@ -187,15 +187,34 @@ export function WithdrawCard() {
         {errorMsg && (
           <div role="alert" className="flex items-start gap-1.5 rounded-xl bg-carry-red/10 border border-carry-red/20 px-3 py-2 text-[11px] text-carry-red">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-            <div>
-              <p className="line-clamp-2">{errorMsg}</p>
-              <button
-                type="button"
-                onClick={wd.reset}
-                className="mt-1 underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
-              >
-                Try again
-              </button>
+            <div className="flex-1">
+              {wd.isReverted ? (
+                <>
+                  <p className="font-medium">Reverted on-chain</p>
+                  <p className="line-clamp-2 mt-0.5 text-dark-secondary">{errorMsg}</p>
+                </>
+              ) : (
+                <p className="line-clamp-2">{errorMsg}</p>
+              )}
+              <div className="mt-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={wd.reset}
+                  className="underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
+                >
+                  Try again
+                </button>
+                {wd.revertedHash && (
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${wd.revertedHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:no-underline rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-senior"
+                  >
+                    View tx &rarr;
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}
