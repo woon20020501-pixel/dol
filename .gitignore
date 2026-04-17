@@ -46,8 +46,6 @@ contracts/packages/contracts/broadcast/
 contracts/packages/contracts/lcov.info
 contracts/packages/contracts/slither-report.json
 contracts/packages/contracts/foundry.lock
-lib/forge-std/
-lib/openzeppelin-contracts/
 
 # ── Runtime outputs / logs ──────────────────────────────────────────
 logs/

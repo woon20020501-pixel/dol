@@ -89,10 +89,10 @@ Dol is not a concept deck. It is a working full-stack product.
 
 We focused on building a product that works end-to-end, not just presenting an idea.
 
-### Test coverage: **442 passing, 0 failing** across the full stack
+### Test coverage: **444 passing, 0 failing** across the full stack
 
 ```bash
-# Rust runtime tests                (202 passing, 17 live-gated)
+# Rust runtime tests                (204 passing, 17 live-gated)
 cd bot-rs && cargo test --workspace
 
 # Python framework tests           (130 passing)
@@ -104,10 +104,10 @@ cd contracts/packages/contracts && forge test
 
 | Component | Passing | Coverage |
 |---|---:|---|
-| Rust runtime (`bot-rs`) | 202 | decision engine, cycle lock, Pacifica adapter, NAV accounting, parity harness |
+| Rust runtime (`bot-rs`) | 204 | decision engine, cycle lock, Pacifica adapter, NAV accounting, parity harness |
 | Python framework (`strategy`) | 130 | OU MLE, empirical Bernstein, conformal prediction, α-cascade scoring, CVaR, funding cycle lock, chance-constrained portfolio |
 | Solidity contracts (`contracts`) | 110 | `Dol.sol` unit + `PacificaCarryVault` fuzz/invariant tests |
-| **Total** | **442** | **0 failing** |
+| **Total** | **444** | **0 failing** |
 
 Plus 17 additional Rust live-credential integration tests (gated on `PACIFICA_API_KEY`) and a Rust ↔ Python parity harness (`strategy/rust_fixtures/`) that cross-verifies 22 math modules against byte-level expected outputs.
 
@@ -130,7 +130,7 @@ The framework is specified across [`strategy/docs/math-aurora-omega-appendix.md`
 Pacifica is the center of this system, not an afterthought.
 
 1. **Public funding-rate feed** — hourly rates for all 10 symbols, parsed into annualized APY.
-2. **Order-book depth** — feeds the fractal liquidity allocator (`strategy/depth_threshold.py`).
+2. **Order-book depth** — feeds the fractal liquidity allocator (`strategy/strategy/depth_threshold.py`).
 3. **Authenticated account endpoint** — real API-key sign-in with Ed25519 (`bot-rs/crates/bot-adapters/src/pacifica_auth.rs`).
 4. **Builder-code attribution** — every decision tagged in the signal JSON audit trail; routed to our registered builder account for the revenue-share program.
 5. **XAU / XAG / PAXG real-world-asset perps** — Pacifica's RWA-perps as first-class yield sources. Most perp venues don't list gold or silver at all.
@@ -233,7 +233,7 @@ Built by a team of two for the Pacifica Hackathon:
 | **Quantitative researcher** | Strategy design, Aurora-Ω math framework, formal proofs (strict-propriety, empirical Bernstein, CVaR derivation), risk model, funding-cycle lock spec |
 | **Engineer** | Rust runtime (8-crate workspace), Solidity contracts, Next.js dashboard, Pacifica authenticated adapter, Rust ↔ Python parity harness |
 
-Two people, four languages (Rust / Python / Solidity / TypeScript), 442 passing tests, one deployed contract, one end-to-end retail UX.
+Two people, four languages (Rust / Python / Solidity / TypeScript), 444 passing tests, one deployed contract, one end-to-end retail UX.
 
 ---
 
