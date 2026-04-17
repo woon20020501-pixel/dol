@@ -1,0 +1,456 @@
+{
+  "fixture_version": "1.0",
+  "framework_revision": "aurora-omega-1.1.4",
+  "generated_from": "strategy/funding_cycle_lock.py",
+  "reference_spec_sections": [
+    "aurora-omega-spec.md \u00a73.1",
+    "integration-spec.md \u00a72.1 (I-LOCK)",
+    "v0-punchlist.md T0-1"
+  ],
+  "parity_requirements": {
+    "integer_fields": "exact equality",
+    "float_fields": "6 decimal place equality",
+    "bool_fields": "exact equality",
+    "none_passthrough": "None state must serialize and deserialize as null/None"
+  },
+  "n_cases": 28,
+  "cases": [
+    {
+      "id": "cycle_index_zero",
+      "function": "cycle_index",
+      "input": {
+        "t": 0.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 0
+      },
+      "note": "origin"
+    },
+    {
+      "id": "cycle_index_just_before_boundary",
+      "function": "cycle_index",
+      "input": {
+        "t": 3599.999,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 0
+      }
+    },
+    {
+      "id": "cycle_index_at_boundary",
+      "function": "cycle_index",
+      "input": {
+        "t": 3600.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 1
+      },
+      "note": "exact boundary \u2014 must round down to next cycle"
+    },
+    {
+      "id": "cycle_index_high_timestamp",
+      "function": "cycle_index",
+      "input": {
+        "t": 1776000000.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 493333
+      },
+      "note": "realistic 2026 unix epoch"
+    },
+    {
+      "id": "cycle_index_venue_alt_cadence",
+      "function": "cycle_index",
+      "input": {
+        "t": 28800.0,
+        "cycle_seconds": 28800
+      },
+      "expected": {
+        "value": 1
+      },
+      "note": "8h venue cadence (e.g. historical HL)"
+    },
+    {
+      "id": "cycle_phase_start",
+      "function": "cycle_phase",
+      "input": {
+        "t": 0.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 0.0
+      }
+    },
+    {
+      "id": "cycle_phase_mid",
+      "function": "cycle_phase",
+      "input": {
+        "t": 1800.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 0.5
+      }
+    },
+    {
+      "id": "cycle_phase_near_end",
+      "function": "cycle_phase",
+      "input": {
+        "t": 3500.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 0.9722222222222222
+      }
+    },
+    {
+      "id": "sec_to_end_start",
+      "function": "seconds_to_cycle_end",
+      "input": {
+        "t": 0.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 3600.0
+      }
+    },
+    {
+      "id": "sec_to_end_mid",
+      "function": "seconds_to_cycle_end",
+      "input": {
+        "t": 1800.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 1800.0
+      }
+    },
+    {
+      "id": "sec_to_end_near_end",
+      "function": "seconds_to_cycle_end",
+      "input": {
+        "t": 3500.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "value": 100.0
+      }
+    },
+    {
+      "id": "is_locked_none_state",
+      "function": "is_locked",
+      "input": {
+        "state": null,
+        "now": 1000.0
+      },
+      "expected": {
+        "value": false
+      }
+    },
+    {
+      "id": "is_locked_inside_cycle",
+      "function": "is_locked",
+      "input": {
+        "state": {
+          "cycle_index": 100,
+          "h_c": 1,
+          "N_c": 50000.0,
+          "opened_at": 360000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 360500.0
+      },
+      "expected": {
+        "value": true
+      }
+    },
+    {
+      "id": "is_locked_after_expiry",
+      "function": "is_locked",
+      "input": {
+        "state": {
+          "cycle_index": 100,
+          "h_c": 1,
+          "N_c": 50000.0,
+          "opened_at": 360000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 365000.0
+      },
+      "expected": {
+        "value": false
+      },
+      "note": "cycle expired \u2014 state is stale, returns False"
+    },
+    {
+      "id": "open_cycle_basic_long",
+      "function": "open_cycle",
+      "input": {
+        "now": 100000.0,
+        "h_c": 1,
+        "N_c": 25000.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "state": {
+          "cycle_index": 27,
+          "h_c": 1,
+          "N_c": 25000.0,
+          "opened_at": 100000.0,
+          "cycle_seconds": 3600
+        }
+      }
+    },
+    {
+      "id": "open_cycle_basic_short",
+      "function": "open_cycle",
+      "input": {
+        "now": 200000.0,
+        "h_c": -1,
+        "N_c": 75000.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "state": {
+          "cycle_index": 55,
+          "h_c": -1,
+          "N_c": 75000.0,
+          "opened_at": 200000.0,
+          "cycle_seconds": 3600
+        }
+      }
+    },
+    {
+      "id": "open_cycle_flat",
+      "function": "open_cycle",
+      "input": {
+        "now": 300000.0,
+        "h_c": 0,
+        "N_c": 0.0,
+        "cycle_seconds": 3600
+      },
+      "expected": {
+        "state": {
+          "cycle_index": 83,
+          "h_c": 0,
+          "N_c": 0.0,
+          "opened_at": 300000.0,
+          "cycle_seconds": 3600
+        }
+      },
+      "note": "intentionally flat cycle \u2014 lock still applies"
+    },
+    {
+      "id": "open_cycle_alt_cadence",
+      "function": "open_cycle",
+      "input": {
+        "now": 500000.0,
+        "h_c": 1,
+        "N_c": 10000.0,
+        "cycle_seconds": 28800
+      },
+      "expected": {
+        "state": {
+          "cycle_index": 17,
+          "h_c": 1,
+          "N_c": 10000.0,
+          "opened_at": 500000.0,
+          "cycle_seconds": 28800
+        }
+      }
+    },
+    {
+      "id": "enforce_locked_rejects_flip",
+      "function": "enforce",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1000500.0,
+        "proposed_h": -1,
+        "proposed_N": 100000.0,
+        "emergency_override": false
+      },
+      "expected": {
+        "h_eff": 1,
+        "n_eff": 30000.0
+      },
+      "note": "locked cycle with h_c=+1 rejects proposed flip to -1"
+    },
+    {
+      "id": "enforce_locked_keeps_notional",
+      "function": "enforce",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1001000.0,
+        "proposed_h": 1,
+        "proposed_N": 999999.0,
+        "emergency_override": false
+      },
+      "expected": {
+        "h_eff": 1,
+        "n_eff": 999999.0
+      },
+      "note": "same direction but different notional \u2014 still returns locked N_c"
+    },
+    {
+      "id": "enforce_emergency_override",
+      "function": "enforce",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1002000.0,
+        "proposed_h": -1,
+        "proposed_N": 88000.0,
+        "emergency_override": true
+      },
+      "expected": {
+        "h_eff": -1,
+        "n_eff": 88000.0
+      },
+      "note": "emergency_override=True passes proposed values through"
+    },
+    {
+      "id": "enforce_expired_passes_through",
+      "function": "enforce",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1010000.0,
+        "proposed_h": -1,
+        "proposed_N": 60000.0,
+        "emergency_override": false
+      },
+      "expected": {
+        "h_eff": -1,
+        "n_eff": 60000.0
+      },
+      "note": "cycle expired \u2014 enforce passes proposed through without lock"
+    },
+    {
+      "id": "enforce_no_state_passes_through",
+      "function": "enforce",
+      "input": {
+        "state": null,
+        "now": 100.0,
+        "proposed_h": 1,
+        "proposed_N": 10000.0,
+        "emergency_override": false
+      },
+      "expected": {
+        "h_eff": 1,
+        "n_eff": 10000.0
+      }
+    },
+    {
+      "id": "would_violate_flip_inside_lock",
+      "function": "would_violate_lock",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1000500.0,
+        "proposed_h": -1
+      },
+      "expected": {
+        "value": true
+      }
+    },
+    {
+      "id": "would_violate_same_direction",
+      "function": "would_violate_lock",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1000500.0,
+        "proposed_h": 1
+      },
+      "expected": {
+        "value": false
+      }
+    },
+    {
+      "id": "would_violate_flat_inside_lock",
+      "function": "would_violate_lock",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1000500.0,
+        "proposed_h": 0
+      },
+      "expected": {
+        "value": true
+      },
+      "note": "flat proposal inside long lock is still a violation (h_c != 0)"
+    },
+    {
+      "id": "would_violate_none_state",
+      "function": "would_violate_lock",
+      "input": {
+        "state": null,
+        "now": 1000500.0,
+        "proposed_h": -1
+      },
+      "expected": {
+        "value": false
+      }
+    },
+    {
+      "id": "would_violate_expired",
+      "function": "would_violate_lock",
+      "input": {
+        "state": {
+          "cycle_index": 277,
+          "h_c": 1,
+          "N_c": 30000.0,
+          "opened_at": 1000000.0,
+          "cycle_seconds": 3600
+        },
+        "now": 1100000.0,
+        "proposed_h": -1
+      },
+      "expected": {
+        "value": false
+      },
+      "note": "expired lock \u2014 no violation"
+    }
+  ]
+}
