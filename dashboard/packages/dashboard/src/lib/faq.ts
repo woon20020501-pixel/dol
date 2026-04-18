@@ -6,7 +6,7 @@
  *
  *   # FAQ
  *   **Version ...**
- *   > Format note for the dashboard integration: ...   ← strip
+ *   > Format note: ...   ← strip
  *   ---
  *   ## Category 1 — General
  *   ### Question A
@@ -16,7 +16,7 @@
  *   ---
  *   ## Category 2 — ...
  *   ...
- *   ## Category metadata (for the dashboard tab generation)   ← strip everything from here on
+ *   ## Category metadata (for tab generation)   ← strip everything from here on
  *
  * Answers can span multiple paragraphs. Category dividers are `---`
  * horizontal rules, which we ignore since the `## Category` heading
@@ -49,8 +49,8 @@ function slugify(text: string): string {
 }
 
 // Stable category id derived from the "## Category N — Label" heading.
-// Maps each heading label to the id set VP used in the source metadata
-// block at the bottom of the file, so we can rely on stable URL anchors.
+// Maps each heading label to the id set in the source metadata block
+// at the bottom of the file, so we can rely on stable URL anchors.
 const LABEL_TO_ID: Record<string, string> = {
   General: "general",
   "Buying & Holding": "buying",
@@ -64,15 +64,15 @@ const LABEL_TO_ID: Record<string, string> = {
 export function parseFaq(raw: string): FaqCategory[] {
   const text = raw.replace(/\r\n/g, "\n");
 
-  // Drop the Agent-C format-note blockquote wherever it sits near the top.
+  // Drop the format-note blockquote wherever it sits near the top.
   // Using [\s\S] instead of the `s` (dotall) flag for es2017 compat.
   const sansNote = text.replace(
-    /^>\s*\*\*Format note for the dashboard[\s\S]*?(?=\n\n|\n#)/m,
+    /^>\s*\*\*Format note[\s\S]*?(?=\n\n|\n#)/m,
     "",
   );
 
   // Drop everything from the category metadata block onward. That block
-  // is VP-facing authoring context, not user content.
+  // is authoring context, not user content.
   const metaIdx = sansNote.indexOf("## Category metadata");
   const body = metaIdx >= 0 ? sansNote.slice(0, metaIdx) : sansNote;
 

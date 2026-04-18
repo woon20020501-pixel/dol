@@ -208,7 +208,6 @@ impl PacificaAuthenticatedAdapter {
     /// `PACIFICA_BUILDER_CODE`.
     ///
     /// Fails with a descriptive error if either variable is missing or empty.
-    ///
     pub fn from_env() -> Result<Self, AdapterError> {
         let api_key = std::env::var(ENV_API_KEY).map_err(|_| {
             AdapterError::Parse(format!(

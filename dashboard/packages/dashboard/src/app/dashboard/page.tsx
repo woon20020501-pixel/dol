@@ -20,17 +20,22 @@ import {
   useAuroraTelemetry,
 } from "@/hooks/useAuroraTelemetry";
 
-// Dynamic-import the two heaviest Recharts consumers. Each pulls
-// Recharts (≈50 kB min+gz) plus 600+ lines of chart rendering code.
-// The hero row + vault cards render instantly; the charts hydrate
-// shortly after via a skeleton. Net effect: dashboard LCP/TTI move
-// off the charts' critical path, improving Lighthouse perf score
-// without changing the visual order.
+// Dynamic-import the two Recharts-heavy panels. Each pulls Recharts
+// (~50 kB min+gz) plus 600+ lines of chart code — deferring them
+// cuts /dashboard FLJS by ~164 kB.
 //
-// ssr:false is deliberate — these components read window/Recharts
-// internals that fail under Node SSR. The sibling <AuroraConsole>
-// fallback used to produce hydration warnings; the skeleton avoids
-// the flash by reserving equivalent vertical space.
+// CRITICAL: skeleton heights must match the actual rendered
+// component height. We measured with Playwright offsetHeight:
+//   - AuroraConsole renders as a SECTION ~915px tall on desktop.
+//   - MultiSymbolNavPanel + the right-column vault cards share the
+//     grid row which is ~928px tall; the panel itself is the left
+//     1fr column (~900px after accounting for DepositCard column).
+// A mismatched skeleton (we previously used 480/520) caused a
+// cumulative-layout-shift of 0.32 when the real components mounted
+// and pushed HeroStats below them — Lighthouse weights CLS at 25%
+// of Performance, so the shift cost more than the bundle savings.
+// Matching the skeleton to the real height holds layout stable,
+// so we keep both the FLJS win AND zero CLS.
 const AuroraConsole = dynamic(
   () =>
     import("@/components/aurora/AuroraConsole").then((m) => ({
@@ -39,9 +44,9 @@ const AuroraConsole = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div
+      <section
         aria-hidden="true"
-        className="mb-4 h-[480px] rounded-2xl border border-dark-border bg-dark-surface/40 animate-pulse"
+        className="mb-6 h-[915px] rounded-2xl border border-senior/25 bg-dark-surface/40 animate-pulse"
       />
     ),
   },
@@ -56,13 +61,13 @@ const MultiSymbolNavPanel = dynamic(
     loading: () => (
       <div
         aria-hidden="true"
-        className="h-[520px] rounded-2xl border border-dark-border bg-dark-surface/40 animate-pulse"
+        className="h-[900px] rounded-2xl border border-dark-border bg-dark-surface/40 animate-pulse"
       />
     ),
   },
 );
 
-// Mandate constants from  / research v3.5.2 dry run.
+// Mandate constants from the v3.5.2 dry run.
 // v3.5.2 production: gross 14.20% APY → customer 8.00% (capped),
 // buffer 4.78%, reserve 1.42%. Treat 8/14.2 ≈ 0.5634 as the
 // "customer share of gross before the cap kicks in".

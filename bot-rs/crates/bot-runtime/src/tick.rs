@@ -55,7 +55,7 @@ pub struct TickOutput {
     pub cycle_lock: CycleLockInfo,
     /// Adapter health snapshot for this symbol AFTER this tick's fetch
     /// attempts were recorded. Rolled up into signal JSON diagnostics so
-    /// the dashboard's dashboard can flag flaky symbols. 
+    /// the dashboard can flag flaky symbols.
     pub adapter_health: SymbolHealth,
     /// NAV after applying the decision accrual.
     pub nav_after: f64,
@@ -184,6 +184,11 @@ impl TickEngine {
     /// history, plus the scalar time inputs). Bundling into a struct would
     /// just rename the 9 fields and not reduce the actual dependency count.
     #[allow(clippy::too_many_arguments)]
+    #[tracing::instrument(
+        name = "run_one_tick",
+        skip_all,
+        fields(symbol = %symbol, now_ms, dt_s = dt_seconds)
+    )]
     pub async fn run_one_tick(
         &self,
         symbol: &str,
@@ -335,12 +340,28 @@ impl TickEngine {
         }
 
         // ── Step 5: Iron law enforcement (I-LOCK) ─────────────────────────
-        let outcome: EnforceOutcome = cycle_lock_registry.enforce_decision(
-            symbol,
-            now_s,
-            proposed.as_ref(),
-            false, // emergency_override
-        );
+        // Prefer the typestate-safe path: project the runtime symbol
+        // string into a compile-time marker via `with_symbol_marker!`.
+        // Inside that scope, `PairDecision::try_typed::<M>()` attaches
+        // the marker and `enforce_decision_typed::<M>()` uses `M::NAME`
+        // as the registry key — so `(symbol, decision)` can no longer
+        // desynchronise.
+        //
+        // If the runtime symbol isn't in the marker whitelist (e.g. a
+        // newly-listed coin that hasn't been added to `declare_markers!`
+        // yet) we fall back to the untyped path with a warning so the
+        // tick loop doesn't block.
+        let outcome: EnforceOutcome = bot_types::with_symbol_marker!(symbol, |M| {
+            let typed = proposed.as_ref().and_then(|d| d.try_typed::<M>());
+            cycle_lock_registry.enforce_decision_typed::<M>(now_s, typed, false)
+        })
+        .unwrap_or_else(|| {
+            tracing::warn!(
+                symbol = %symbol,
+                "cycle_lock: no compile-time marker for symbol — using untyped enforce"
+            );
+            cycle_lock_registry.enforce_decision(symbol, now_s, proposed.as_ref(), false)
+        });
         let effective = outcome.effective.clone();
 
         // Log enforcement visibility.

@@ -11,13 +11,12 @@
 //! The wiring check is defense-in-depth: even if the operator sets the
 //! env var, the bot refuses to start in live mode until the v0 subset
 //! from `integration-spec.md` §3.5 is actually implemented. See
-//! the spec for the current status.
+//! the live-promotion checklist for the current status.
 //!
-//! Per the spec: this shape (env-gated at startup + component
-//! checklist) is the authoritative spec. An earlier library function
-//! `assert_live_allowed()` is preserved below as a lower-level helper
-//! for any call site that wants to re-verify the env var at a submission
-//! boundary in Week 2+; but the authoritative entry is
+//! The env-gated-at-startup + component-checklist shape is the authoritative
+//! spec. An earlier library function `assert_live_allowed()` is preserved
+//! below as a lower-level helper for any call site that wants to re-verify
+//! the env var at a submission boundary; but the authoritative entry is
 //! [`preflight_live_gate`].
 
 use std::env;
@@ -68,7 +67,8 @@ pub fn preflight_live_gate() -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "{}=1 requested but the following v0 components are not wired: {}.",
+            "{}=1 requested but the following v0 components are not wired: {}. \
+             See the live-promotion checklist for details.",
             RUNNER_ALLOW_LIVE_ENV,
             missing.join(", ")
         ))
@@ -89,9 +89,9 @@ pub fn preflight_live_gate() -> Result<(), String> {
 
 /// I-LOCK: `funding_cycle_lock.enforce()` wired into the decision path.
 ///
-/// Status: **true** — ported in Week 1 Step B (agent-J- / PM override)
-/// and threaded through `TickEngine::run_one_tick` via
-/// `cycle_lock::CycleLockRegistry`. Live tick proven against Pacifica API.
+/// Status: **true** — ported in Week 1 Step B and threaded through
+/// `TickEngine::run_one_tick` via `cycle_lock::CycleLockRegistry`.
+/// Live tick proven against Pacifica API.
 pub const fn has_funding_cycle_lock() -> bool {
     true
 }
@@ -169,7 +169,8 @@ pub fn assert_live_allowed() -> anyhow::Result<()> {
             v
         )),
         Err(_) => Err(anyhow::anyhow!(
-            "{} env var not set — live submission blocked.",
+            "{} env var not set — live submission blocked. \
+             See the live-promotion checklist.",
             RUNNER_ALLOW_LIVE_ENV
         )),
     }
@@ -218,7 +219,7 @@ mod tests {
     #[test]
     fn preflight_demo_mode_passes_when_true_string() {
         with_env(RUNNER_ALLOW_LIVE_ENV, Some("true"), || {
-            // Not "1" → treated as demo mode (silent pass). Matches the spec spec.
+            // Not "1" → treated as demo mode (silent pass). Matches the spec.
             assert!(preflight_live_gate().is_ok());
         });
     }

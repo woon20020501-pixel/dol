@@ -89,10 +89,10 @@ Dol is not a concept deck. It is a working full-stack product.
 
 We focused on building a product that works end-to-end, not just presenting an idea.
 
-### Test coverage: **687 passing, 0 failing** across the full stack
+### Test coverage: **737 passing, 0 failing** across the full stack
 
 ```bash
-# Rust runtime tests                (361 passing, 17 live-gated)
+# Rust runtime tests                (411 passing, 11 live-gated)
 cd bot-rs && cargo test --workspace
 
 # Python framework tests           (130 passing)
@@ -104,12 +104,12 @@ cd contracts/packages/contracts && forge test
 
 | Component | Passing | Coverage |
 |---|---:|---|
-| Rust runtime (`bot-rs`) | 361 | decision engine, cycle lock, Pacifica adapter, NAV accounting, parity harness |
+| Rust runtime (`bot-rs`) | 411 | decision engine, cycle lock, Pacifica adapter, NAV accounting, parity harness |
 | Python framework (`strategy`) | 130 | OU MLE, empirical Bernstein, conformal prediction, α-cascade scoring, CVaR, funding cycle lock, chance-constrained portfolio |
 | Solidity contracts (`contracts`) | 196 | `Dol.sol` unit + `PacificaCarryVault` fuzz/invariant + 11 test suites |
-| **Total** | **687** | **0 failing** |
+| **Total** | **737** | **0 failing** |
 
-Plus 17 additional Rust live-credential integration tests (gated on `PACIFICA_API_KEY`) and a Rust ↔ Python parity harness (`strategy/rust_fixtures/`) that cross-verifies 22 math modules against byte-level expected outputs.
+Plus 11 additional Rust live-credential integration tests (gated on `PACIFICA_API_KEY`) and a Rust ↔ Python parity harness (`strategy/rust_fixtures/`) that cross-verifies 22 math modules against byte-level expected outputs.
 
 ---
 
@@ -233,7 +233,7 @@ Built by a team of two for the Pacifica Hackathon:
 | **Quantitative researcher** | Strategy design, Aurora-Ω math framework, formal proofs (strict-propriety, empirical Bernstein, CVaR derivation), risk model, funding-cycle lock spec |
 | **Engineer** | Rust runtime (8-crate workspace), Solidity contracts, Next.js dashboard, Pacifica authenticated adapter, Rust ↔ Python parity harness |
 
-Two people, four languages (Rust / Python / Solidity / TypeScript), 687 passing tests, one deployed contract, one end-to-end retail UX.
+Two people, four languages (Rust / Python / Solidity / TypeScript), 737 passing tests, one deployed contract, one end-to-end retail UX.
 
 ---
 

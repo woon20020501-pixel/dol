@@ -13,6 +13,7 @@
 //! live-submission path to plug later).
 
 pub mod adapter_health;
+pub mod backpressure;
 pub mod clock;
 pub mod cycle_lock;
 pub mod decision;
@@ -25,3 +26,4 @@ pub mod risk;
 pub mod scoring;
 pub mod signal;
 pub mod tick;
+pub mod tracing_redact;

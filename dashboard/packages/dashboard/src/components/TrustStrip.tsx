@@ -17,7 +17,7 @@ import { motion, useInView } from "framer-motion";
  *      reaching for Google
  *
  * Banned vocabulary ("smart contract", "APY", "yield", "earn",
- * "interest") is avoided per the  landing cleanup audit.
+ * "interest") is avoided per the landing cleanup audit.
  *
  * Layout: responsive grid — two columns on phones, five across on
  * desktop. Icons use Tabler/Lucide strokes at 20 px, wrapped in a

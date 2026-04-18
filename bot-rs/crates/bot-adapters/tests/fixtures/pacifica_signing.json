@@ -1,0 +1,107 @@
+[
+  {
+    "name": "limit_order_basic",
+    "header": {
+      "type": "create_order",
+      "timestamp": 1700000000000,
+      "expiry_window": 5000
+    },
+    "payload": {
+      "symbol": "BTC",
+      "price": "100000",
+      "reduce_only": false,
+      "amount": "0.1",
+      "side": "bid",
+      "tif": "GTC",
+      "client_order_id": "abc-123"
+    },
+    "expected_message": "{\"data\":{\"amount\":\"0.1\",\"client_order_id\":\"abc-123\",\"price\":\"100000\",\"reduce_only\":false,\"side\":\"bid\",\"symbol\":\"BTC\",\"tif\":\"GTC\"},\"expiry_window\":5000,\"timestamp\":1700000000000,\"type\":\"create_order\"}"
+  },
+  {
+    "name": "market_order_basic",
+    "header": {
+      "type": "create_market_order",
+      "timestamp": 1700000000000,
+      "expiry_window": 5000
+    },
+    "payload": {
+      "symbol": "BTC",
+      "reduce_only": false,
+      "amount": "0.1",
+      "side": "bid",
+      "slippage_percent": "0.5",
+      "client_order_id": "abc-123"
+    },
+    "expected_message": "{\"data\":{\"amount\":\"0.1\",\"client_order_id\":\"abc-123\",\"reduce_only\":false,\"side\":\"bid\",\"slippage_percent\":\"0.5\",\"symbol\":\"BTC\"},\"expiry_window\":5000,\"timestamp\":1700000000000,\"type\":\"create_market_order\"}"
+  },
+  {
+    "name": "cancel_by_order_id",
+    "header": {
+      "type": "cancel_order",
+      "timestamp": 1700000000000,
+      "expiry_window": 5000
+    },
+    "payload": {
+      "symbol": "BTC",
+      "order_id": 12345
+    },
+    "expected_message": "{\"data\":{\"order_id\":12345,\"symbol\":\"BTC\"},\"expiry_window\":5000,\"timestamp\":1700000000000,\"type\":\"cancel_order\"}"
+  },
+  {
+    "name": "cancel_by_client_order_id",
+    "header": {
+      "type": "cancel_order",
+      "timestamp": 1700000000000,
+      "expiry_window": 5000
+    },
+    "payload": {
+      "symbol": "BTC",
+      "client_order_id": "my-cid-uuid"
+    },
+    "expected_message": "{\"data\":{\"client_order_id\":\"my-cid-uuid\",\"symbol\":\"BTC\"},\"expiry_window\":5000,\"timestamp\":1700000000000,\"type\":\"cancel_order\"}"
+  },
+  {
+    "name": "limit_order_eth_ask",
+    "header": {
+      "type": "create_order",
+      "timestamp": 1700000001234,
+      "expiry_window": 5000
+    },
+    "payload": {
+      "symbol": "ETH",
+      "price": "3500.5",
+      "reduce_only": true,
+      "amount": "2.5",
+      "side": "ask",
+      "tif": "IOC",
+      "client_order_id": "cid-99"
+    },
+    "expected_message": "{\"data\":{\"amount\":\"2.5\",\"client_order_id\":\"cid-99\",\"price\":\"3500.5\",\"reduce_only\":true,\"side\":\"ask\",\"symbol\":\"ETH\",\"tif\":\"IOC\"},\"expiry_window\":5000,\"timestamp\":1700000001234,\"type\":\"create_order\"}"
+  },
+  {
+    "name": "sort_stress_nested_arrays",
+    "header": {
+      "type": "weird_for_test",
+      "timestamp": 1,
+      "expiry_window": 0
+    },
+    "payload": {
+      "b": 1,
+      "a": {
+        "z": 2,
+        "y": 1
+      },
+      "arr": [
+        {
+          "b": 2,
+          "a": 1
+        },
+        {
+          "d": 4,
+          "c": 3
+        }
+      ]
+    },
+    "expected_message": "{\"data\":{\"a\":{\"y\":1,\"z\":2},\"arr\":[{\"a\":1,\"b\":2},{\"c\":3,\"d\":4}],\"b\":1},\"expiry_window\":0,\"timestamp\":1,\"type\":\"weird_for_test\"}"
+  }
+]

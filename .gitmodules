@@ -4,3 +4,6 @@
 [submodule "contracts/packages/contracts/lib/openzeppelin-contracts"]
 	path = contracts/packages/contracts/lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
+[submodule "bot-rs/third_party/pacifica-python-sdk"]
+	path = bot-rs/third_party/pacifica-python-sdk
+	url = https://github.com/pacifica-fi/python-sdk.git

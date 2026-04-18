@@ -8,7 +8,7 @@
 //!   - φ invariants             : Analytic properties of 1-exp(-x)/x absorption kernel.
 //!   - HHI bounds               : Hirschman (1964), HHI ∈ [1/N, 1].
 //!   - CVaR monotonicity        : Rockafellar-Uryasev (2000) Theorem 1 — ∂CVaR/∂α ≥ 0.
-//!   - cap_routing conservation : PRINCIPLES.md spec §I.1 — ∑ slices = gross.
+//!   - cap_routing conservation : capital-conservation invariant I.1 — ∑ slices = gross.
 //!   - Bernstein monotonicity   : L^R(τ) decreasing in τ (more variance → tighter bound).
 //!
 //! Run with `cargo test -p bot-math --test proptests` (or full workspace).
@@ -110,7 +110,7 @@ proptest! {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// cap_routing conservation (PRINCIPLES.md spec §I.1)
+// cap_routing conservation (capital-conservation invariant I.1)
 // ─────────────────────────────────────────────────────────────────────────────
 
 proptest! {

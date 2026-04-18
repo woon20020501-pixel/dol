@@ -63,6 +63,11 @@ impl RiskStack {
     /// - `now`             : current Instant (for watchdog / heartbeat)
     ///
     /// Output: the WORST decision among all guards, with reasons concatenated.
+    #[tracing::instrument(
+        name = "risk_stack.evaluate",
+        skip_all,
+        fields(nav_usd, n_exposures = exposures.len())
+    )]
     pub fn evaluate(
         &mut self,
         nav_usd: f64,

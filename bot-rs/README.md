@@ -152,7 +152,7 @@ cd bot-rs
 cargo test --workspace
 ```
 
-Current: **361 passed, 0 failed, 17 ignored.**
+Current: **411 passed, 0 failed, 11 ignored.**
 
 Coverage by suite:
 

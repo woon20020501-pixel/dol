@@ -1,4 +1,4 @@
-//! Rust port of `strategy/strategy/fsm_controller.py`.
+//! Rust port of `strategy/fsm_controller.py`.
 //!
 //! Aurora-Ω §22, §23 fail-safe FSM + Kelly/Neutral/Robust selector.
 //!

@@ -213,6 +213,122 @@ async fn pacifica_ws_caches_latest_state() {
 }
 
 #[tokio::test]
+async fn pacifica_ws_resyncs_after_reconnect() {
+    // Verifies the adapter re-subscribes AND picks up a fresh snapshot
+    // from the second connection rather than serving stale data from the
+    // first (dropped) connection. This is the diff-update resync guarantee.
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
+    let bound_addr = listener.local_addr().unwrap();
+
+    let cache = Arc::new(Mutex::new(PacificaCache::default()));
+    let circuit = Arc::new(Mutex::new(CircuitBreaker::default_production()));
+    let (event_tx, mut event_rx) = mpsc::channel(64);
+    let (ws_shutdown_tx, ws_shutdown_rx) = watch::channel(false);
+    let ws_url = format!("ws://{}", bound_addr);
+
+    // Server script: first connection sends funding=0.0001 then drops;
+    // second connection sends funding=0.0007 (the post-resync value) and
+    // stays open until shutdown.
+    let server_handle = tokio::spawn(async move {
+        // First connection — emit stale value, then drop.
+        {
+            let (stream, _) = listener.accept().await.unwrap();
+            let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let (mut write, mut read) = ws.split();
+            for _ in 0..2 {
+                let _ = time::timeout(Duration::from_millis(300), read.next()).await;
+            }
+            let stale = json!({
+                "channel": "prices",
+                "data": [{
+                    "symbol": "USDJPY",
+                    "funding": "0.0001",
+                    "next_funding": "0",
+                    "timestamp": 0.0
+                }]
+            });
+            let _ = write.send(Message::Text(stale.to_string())).await;
+            let _ = write.send(Message::Close(None)).await;
+            time::sleep(Duration::from_millis(100)).await;
+        }
+        // Second connection — emit fresh value, stay open.
+        let (stream, _) = listener.accept().await.unwrap();
+        let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        let (mut write, mut read) = ws.split();
+        for _ in 0..2 {
+            let _ = time::timeout(Duration::from_millis(300), read.next()).await;
+        }
+        for _ in 0..5 {
+            let fresh = json!({
+                "channel": "prices",
+                "data": [{
+                    "symbol": "USDJPY",
+                    "funding": "0.0007",
+                    "next_funding": "0",
+                    "timestamp": 0.0
+                }]
+            });
+            let _ = write.send(Message::Text(fresh.to_string())).await;
+            time::sleep(Duration::from_millis(100)).await;
+        }
+    });
+
+    let ws_handle = tokio::spawn(pacifica_ws_loop(
+        ws_url,
+        "USDJPY".into(),
+        cache.clone(),
+        circuit.clone(),
+        event_tx,
+        ws_shutdown_rx,
+    ));
+
+    // Drain events. Look for FundingUpdate events whose rate matches
+    // stale (0.0001) and fresh (0.0007) values; require disconnect in between.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let mut saw_stale = false;
+    let mut saw_disconnect = false;
+    let mut saw_fresh = false;
+    while std::time::Instant::now() < deadline && !saw_fresh {
+        let recv = time::timeout(Duration::from_millis(200), event_rx.recv()).await;
+        if let Ok(Some(ev)) = recv {
+            // VenueEvent::FundingUpdate has an embedded FundingRate.
+            // We match on any variant whose Debug string contains our
+            // sentinel rate values — robust to field-name drift.
+            let dbg = format!("{:?}", ev);
+            if dbg.contains("0.0001") {
+                saw_stale = true;
+            }
+            if dbg.contains("0.0007") {
+                saw_fresh = true;
+            }
+            if dbg.contains("Disconnected") {
+                saw_disconnect = true;
+            }
+        }
+    }
+
+    let _ = ws_shutdown_tx.send(true);
+    let _ = time::timeout(Duration::from_secs(3), ws_handle).await;
+    let _ = server_handle.await;
+
+    // Cache must carry the post-resync value. We inspect the Debug
+    // output rather than field names (the FundingRate layout evolves).
+    {
+        let c = cache.lock().await;
+        let f = c.funding.clone().expect("cache funding should be set");
+        let dbg = format!("{:?}", f);
+        assert!(
+            dbg.contains("0.0007"),
+            "cache must reflect post-resync value, got {dbg}"
+        );
+    }
+    assert!(saw_stale, "should have observed pre-drop stale value");
+    assert!(saw_disconnect, "should have observed disconnect event");
+    assert!(saw_fresh, "should have observed post-resync fresh value");
+}
+
+#[tokio::test]
 async fn pacifica_ws_reconnects_on_server_drop() {
     let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
     let listener = TcpListener::bind(addr).await.unwrap();

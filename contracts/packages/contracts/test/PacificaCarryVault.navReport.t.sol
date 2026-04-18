@@ -9,17 +9,18 @@ import {MockUSDC} from "./PacificaCarryVault.t.sol";
 
 /// @title PacificaCarryVaultNavReportTest
 /// @notice End-to-end integration tests that exercise the NAV-report signing
-///         flow exactly the way the bot's bot will. Each test constructs the
-///         signing payload from raw fields, hashes with the EIP-191 prefix,
-///         signs with a known operator private key, and submits via
-///         `reportNAV`. These tests serve as the reference the bot mirrors —
-///         if any test in this file breaks, the bot's signer is also broken.
+///         flow exactly the way the off-chain operator bot will. Each test
+///         constructs the signing payload from raw fields, hashes with the
+///         EIP-191 prefix, signs with a known operator private key, and
+///         submits via `reportNAV`. These tests serve as the reference the
+///         bot mirrors — if any test in this file breaks, the bot's signer
+///         is also broken.
 contract PacificaCarryVaultNavReportTest is Test {
     MockUSDC usdc;
     MockMoonwellMarket treasury;
     PacificaCarryVault vault;
 
-    // Deterministic operator key so the bot can reproduce signatures locally.
+    // Deterministic operator key so the off-chain bot can reproduce signatures locally.
     uint256 constant OPERATOR_PK = 0xA11CE;
     address operator;
 
@@ -62,7 +63,7 @@ contract PacificaCarryVaultNavReportTest is Test {
     // ═══════════════════════════════════════════════════════════════════
 
     /// @notice Operator signs a valid NAV update; vault accepts and updates state.
-    /// Protects: the full signing flow the bot will run — payload encoding,
+    /// Protects: the full signing flow the off-chain bot will run — payload encoding,
     ///           EIP-191 prefix, ECDSA signing, contract recovery — must
     ///           round-trip without any byte-level discrepancy.
     function test_reportNAV_validSignature_succeeds() public {
@@ -196,10 +197,10 @@ contract PacificaCarryVaultNavReportTest is Test {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // GOLDEN VECTOR — REFERENCE BYTES FOR AGENT B TO MIRROR
+    // GOLDEN VECTOR — REFERENCE BYTES FOR THE OFF-CHAIN SIGNER TO MIRROR
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Emits a deterministic golden vector to stdout. the bot's
+    /// @notice Emits a deterministic golden vector to stdout. The off-chain
     ///         signer must produce byte-for-byte identical output for the
     ///         same inputs. Run with `forge test --match-test test_goldenVector_emit -vv`
     ///         to see the values logged.

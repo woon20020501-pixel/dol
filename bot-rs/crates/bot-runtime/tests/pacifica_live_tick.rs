@@ -21,7 +21,7 @@ use bot_runtime::tick::TickEngine;
 use bot_types::Venue;
 
 #[tokio::test]
-#[ignore]
+#[ignore = "Live Pacifica REST round-trip for a BTC tick. Run: cargo test -p bot-runtime --test pacifica_live_tick -- --ignored. Requires network access to api.pacifica.fi; no credentials."]
 async fn pacifica_live_one_tick_btc() {
     let mut adapters: BTreeMap<Venue, Arc<dyn VenueAdapter>> = BTreeMap::new();
     adapters.insert(

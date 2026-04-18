@@ -3,7 +3,7 @@ import Link from "next/link";
 /**
  * Minimal site footer carrying legal links + copyright. Sits on every
  * top-level page (`/`, `/deposit`, `/my-dol`) so the legal pages are
- * always one click away — required by .
+ * always one click away.
  *
  * Kept visually quiet so it doesn't compete with hero content. Mobile
  * stacks the links above the copyright line.

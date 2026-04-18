@@ -10,8 +10,8 @@ import {
   type ReactNode,
 } from "react";
 
-// Authoritative numbers from the bot  (2026-04-15)
-// Per-tick NAV should come from nav.jsonl once the bot's runtime is wired;
+// Authoritative numbers from the Rust bot runtime (2026-04-15)
+// Per-tick NAV should come from nav.jsonl once the runtime is wired;
 // for now we drive a deterministic accel-factor simulator client-side so the
 // dashboard can present the Week-1 story even without the Rust bot running.
 
@@ -33,7 +33,7 @@ export const AURORA_CONSTANTS = {
   longVenue: "Pacifica",
   shortVenue: "Backpack",
   symbol: "BTC",
-  //  multi-symbol universe
+  // Multi-symbol universe
   universeSizeDemo: 10,
   universeSizeProd: 46,
   deployedUsdDemo: 1_000,       // 10 × $100
@@ -57,20 +57,20 @@ export type SymbolSpec = {
   kind: SymbolKind;
   counterVenue: string;
   oracleDivergenceRisk: "minimal" | "structural";
-  //  — static baseline for diagnostics.book_parse_failures.
+  // Static baseline for diagnostics.book_parse_failures.
   // RWA symbols (XAU/XAG/PAXG) are degraded-by-construction because
   // Lighter and Backpack don't list gold/silver commodities; the bot
-  // routes them through Pacifica ↔ Hyperliquid (xyz:GOLD/SILVER) per
-  // . This is expected operational state, NOT a fault, and
-  // must render as a gray "reduced coverage" badge (never red alarm).
+  // routes them through Pacifica ↔ Hyperliquid (xyz:GOLD/SILVER).
+  // This is expected operational state, NOT a fault, and must render
+  // as a gray "reduced coverage" badge (never red alarm).
   bookParseDegraded: boolean;
 };
 
-//  canonical 10-symbol universe: 7 crypto + 3 RWA.
-// Spreads are median values from research's week1_hist_spreads.json. BTC is
-// overridden to the Week-1 Pacifica live anomaly (18.92%); the
-// historical median is 0.39% — BTC is the "live outlier" demo case.
-// XAU/XAG/PAXG carry oracle_divergence_risk = "structural"
+// Canonical 10-symbol universe: 7 crypto + 3 RWA.
+// Spreads are median values from the historical spread fixtures. BTC is
+// overridden to the Week-1 Pacifica live anomaly (18.92%); the historical
+// median is 0.39% — BTC is the "live outlier" demo case.
+// XAU/XAG/PAXG carry oracle_divergence_risk = "structural".
 export const SYMBOL_UNIVERSE: SymbolSpec[] = [
   { symbol: "BTC",  spreadPct: 18.92, color: "#f7931a", tier: "anomaly", kind: "crypto", counterVenue: "Hyperliquid",      oracleDivergenceRisk: "minimal",    bookParseDegraded: false },
   { symbol: "XAG",  spreadPct: 12.50, color: "#c0c0c8", tier: "strong",  kind: "rwa",    counterVenue: "trade.xyz:SILVER", oracleDivergenceRisk: "structural", bookParseDegraded: true  },
@@ -108,7 +108,7 @@ export type VenueHealth = {
   label: string;
   fundingApyPct: number | null;
   ageSec: number;
-  // : in LIVE mode we count how many of the 10 signal JSONs
+  // In LIVE mode we count how many of the 10 signal JSONs
   // include this venue under fair_value.contributing_venues.
   // null in SIM mode (signal data unavailable).
   symbolCoverage: { covered: number; total: number } | null;
@@ -180,7 +180,7 @@ export type AuroraTelemetry = {
   decisions: DecisionEvent[];
   fsmMode: "nominal" | "derisk" | "flatten";
   fsmNotionalScale: number;
-  symbols: SymbolState[];       //  10-symbol state, re-ranked every tick
+  symbols: SymbolState[];       // 10-symbol state, re-ranked every tick
   aggregate: AggregateState;    // portfolio-level aggregate (thick line)
 };
 
@@ -231,7 +231,7 @@ function computeNavAtSimHour(simHours: number): {
 }
 
 function buildVenues(simHours: number): VenueHealth[] {
-  // SIM mode conservative default values from  demo day. In LIVE mode the
+  // SIM mode conservative default values. In LIVE mode the
   // per-venue rows below get rebuilt from /api/signal data, with symbol
   // coverage counts replacing the funding APY estimates.
   return [
@@ -728,22 +728,41 @@ function useAuroraTelemetrySource(): AuroraTelemetry {
   useEffect(() => {
     anchorRef.current = getAnchor();
     let raf = 0;
-    // Throttle React re-renders to 60fps. rAF keeps firing at the native
-    // refresh rate (120/144/165Hz) but we only bump state every ~16ms.
-    // Smooth to the eye, caps the derivation work at 60× per second
-    // instead of 144× × consumers.
+    // Throttle React re-renders to 5 Hz to match the seriesBucket
+    // quantization below. Previously ticked at 60 Hz which kept the
+    // main thread busy enough that Lighthouse's TTI metric never
+    // fired (observed as Interactive: 33s, Script Eval: 56s on a
+    // production Lighthouse run). 5 Hz is the rate at which derived
+    // series actually change, so higher rates were pure waste —
+    // React re-rendered the tree 12× per useful update. The NAV
+    // counter's visual smoothness is preserved by framer-motion's
+    // useMotionValue, which runs outside React's render cycle.
+    //
+    // Extra: pause the loop while the tab is hidden. rAF already
+    // stops when backgrounded, but the visibilitychange handler
+    // ensures we don't briefly burst on tab re-focus.
     let lastSetMs = 0;
-    const THROTTLE_MS = 16;
+    const THROTTLE_MS = 200;
+    let paused = typeof document !== "undefined" && document.hidden;
     const tick = () => {
-      const now = performance.now();
-      if (now - lastSetMs >= THROTTLE_MS) {
-        lastSetMs = now;
-        setFrame((n) => (n + 1) & 0x3fffffff);
+      if (!paused) {
+        const now = performance.now();
+        if (now - lastSetMs >= THROTTLE_MS) {
+          lastSetMs = now;
+          setFrame((n) => (n + 1) & 0x3fffffff);
+        }
       }
       raf = requestAnimationFrame(tick);
     };
+    const onVisibilityChange = () => {
+      paused = document.hidden;
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   const anchor = anchorRef.current ?? Date.now();
@@ -805,7 +824,7 @@ function useAuroraTelemetrySource(): AuroraTelemetry {
   ];
 
   // When live data is available, OVERRIDE the simulator's aggregate and
-  // per-symbol state with what the bot's bot actually wrote. Everything
+  // per-symbol state with what the bot actually wrote. Everything
   // else (cycleLock, pairDecision, venues, riskStack, decisions, breakeven
   // reference values) stays on the sim — those don't come from nav.jsonl.
   const useLive = (dataSource === "LIVE" || dataSource === "STALE") && live !== null;
@@ -878,7 +897,7 @@ function useAuroraTelemetrySource(): AuroraTelemetry {
     ? Math.max(0, (live.latestTsMs - live.firstTsMs) / 3_600_000)
     : simHours;
 
-  // ────── /api/signal overrides ( + venues from ) ──────
+  // ────── /api/signal overrides ──────
   // When liveSignal is available we OVERRIDE the per-venue cells, the BTC
   // pair_decision card, the cycle lock ring, fsm.mode badge, and
   // stubbedSections — none of those come from nav.jsonl.
@@ -894,8 +913,8 @@ function useAuroraTelemetrySource(): AuroraTelemetry {
 
   // Build per-venue coverage: for each of the 4 venues, count how many
   // signal JSONs include it under fair_value.contributing_venues. RWA
-  // symbols won't include Lighter or Backpack, so the count
-  // naturally surfaces the structural reduced-coverage state.
+  // symbols won't include Lighter or Backpack, so the count naturally
+  // surfaces the structural reduced-coverage state.
   const liveVenues: VenueHealth[] = haveLiveSignal
     ? (["Pacifica", "Hyperliquid", "Lighter", "Backpack"] as Venue[]).map((v) => {
         let covered = 0;

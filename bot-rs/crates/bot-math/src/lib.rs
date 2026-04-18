@@ -4,7 +4,7 @@
 //! No `unwrap()` in library code; recoverable errors return `Result<_, FrameworkError>`.
 //! No `f64::mul_add` (FMA), no SIMD intrinsics, no `-ffast-math`-equivalent flags.
 //!
-//! Module layout mirrors the spec Part D sections:
+//! Module layout mirrors the Rust design spec Part D sections:
 //!   - `phi`      : D.1  absorption function
 //!   - `ou`       : D.2  OU time-averaged spread
 //!   - `impact`   : D.3  effective spread with impact

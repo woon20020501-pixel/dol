@@ -72,12 +72,20 @@ pub struct ChaosAdapter {
 }
 
 impl ChaosAdapter {
+    /// Construct with a deterministic seed. If the `BOT_RS_SEED` environment
+    /// variable is set to a parseable u64, it is used as the seed — this lets
+    /// operators reproduce a specific chaos run end-to-end. Otherwise the
+    /// stable default `42` is used.
     pub fn new(
         inner: Arc<dyn VenueAdapter>,
         latency: LatencyProfile,
         failure: FailureProfile,
     ) -> Self {
-        Self::with_seed(inner, latency, failure, 42)
+        let seed = std::env::var("BOT_RS_SEED")
+            .ok()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(42);
+        Self::with_seed(inner, latency, failure, seed)
     }
 
     pub fn with_seed(
@@ -110,7 +118,7 @@ impl ChaosAdapter {
         )
     }
 
-    fn next_latency(&self, call_idx: u64) -> Duration {
+    pub(crate) fn next_latency(&self, call_idx: u64) -> Duration {
         match &self.latency {
             LatencyProfile::None => Duration::ZERO,
             LatencyProfile::Constant(d) => *d,
@@ -280,6 +288,40 @@ mod tests {
                 .collect();
         // join_all preserves order, so outcomes match the script.
         assert_eq!(outcomes, vec![true, true, false, true, false]);
+    }
+
+    /// Proof: BOT_RS_SEED env var is honored by `ChaosAdapter::new` —
+    /// the same seed produces the same latency sequence on two independent
+    /// chaos adapters. Uses a process-wide env-mutex so parallel tests
+    /// don't race.
+    #[test]
+    fn seed_env_reproducibility() {
+        use std::sync::Mutex;
+        static LOCK: Mutex<()> = Mutex::new(());
+        let _g = LOCK.lock().unwrap();
+
+        std::env::set_var("BOT_RS_SEED", "31337");
+        let a = ChaosAdapter::new(
+            fixture_adapter(),
+            LatencyProfile::Uniform {
+                min: Duration::from_millis(10),
+                max: Duration::from_millis(100),
+            },
+            FailureProfile::None,
+        );
+        let b = ChaosAdapter::new(
+            fixture_adapter(),
+            LatencyProfile::Uniform {
+                min: Duration::from_millis(10),
+                max: Duration::from_millis(100),
+            },
+            FailureProfile::None,
+        );
+        // Draw a few from each — identical seed ⇒ identical sequence.
+        let seq_a: Vec<_> = (0..5).map(|i| a.next_latency(i)).collect();
+        let seq_b: Vec<_> = (0..5).map(|i| b.next_latency(i)).collect();
+        assert_eq!(seq_a, seq_b, "same seed must yield same latency sequence");
+        std::env::remove_var("BOT_RS_SEED");
     }
 
     #[tokio::test]

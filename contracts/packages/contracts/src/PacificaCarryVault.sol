@@ -60,7 +60,7 @@ contract PacificaCarryVault is ERC4626, ReentrancyGuard, AccessControl {
     uint256 public constant BPS_DENOMINATOR = 10_000;
 
     /// @notice Fee charged on the instant redeem path, in basis points.
-    /// @dev Fixed at 5 bps (0.05%) per policy. Not upgradeable via
+    /// @dev Fixed at 5 bps (0.05%) by design. Not upgradeable via
     ///      setter — a fee change requires a vault redeploy.
     uint16 public constant INSTANT_WITHDRAW_FEE_BPS = 5;
 
@@ -322,7 +322,7 @@ contract PacificaCarryVault is ERC4626, ReentrancyGuard, AccessControl {
     /// @param _treasuryVault Address of the Moonwell-style lending market
     ///        for the 30% base-yield allocation
     /// @param _operator Address granted OPERATOR_ROLE (bot key for NAV signing)
-    /// @param _guardian Address granted GUARDIAN_ROLE (policy key for pause + rotation)
+    /// @param _guardian Address granted GUARDIAN_ROLE (PM key for pause + rotation)
     /// @param _cooldownSeconds Withdraw queue cooldown in seconds (e.g. 86400 = 24h)
     /// @param _feeRecipient Initial recipient of the 5 bps instant-redeem fee
     /// @param _minReportInterval Minimum seconds between accepted NAV reports

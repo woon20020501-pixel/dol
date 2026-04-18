@@ -335,7 +335,7 @@ fn cost_for(d: &PairDecision) -> f64 {
 
 /// Portfolio-level NAV tracker: one `NavTracker` per symbol.
 ///
-/// **Accounting model (fixed):** each per-symbol `NavTracker`
+/// **Accounting model:** each per-symbol `NavTracker`
 /// is initialized with the **full** portfolio starting NAV (not divided).
 /// This way `tracker.nav_usd` seen by `decision::decide` is ≈ portfolio NAV,
 /// so the 1%-of-NAV notional rule yields the correct $100/pair instead of
@@ -637,10 +637,10 @@ mod tests {
 
     #[test]
     fn portfolio_nav_each_tracker_sees_full_nav() {
-        //: portfolio starting NAV is $10k, each pair
-        // notional is 1% of portfolio NAV ($100). The per-symbol tracker
-        // is therefore initialized at the FULL portfolio NAV so that
-        // `tracker.nav_usd` × 1% = $100 (not $10 with a sliced NAV).
+        // Portfolio starting NAV is $10k; each pair notional is 1% of
+        // portfolio NAV ($100). The per-symbol tracker is initialized at
+        // the FULL portfolio NAV so that `tracker.nav_usd` × 1% = $100
+        // (not $10 with a sliced NAV).
         let symbols: Vec<String> = vec!["BTC".to_string(), "ETH".to_string()];
         let pf = PortfolioNav::new(10_000.0, &symbols);
         assert!((pf.trackers["BTC"].nav_usd - 10_000.0).abs() < 1e-12);

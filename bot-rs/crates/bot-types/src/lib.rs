@@ -3,12 +3,14 @@
 //! All newtypes are `Copy + Debug + PartialEq + Serialize + Deserialize`.
 //! No I/O, no async, no external runtime dependencies.
 
+pub mod sym;
+
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
-// Newtype wrappers (math-first typing — spec §A.1)
+// Newtype wrappers (math-first typing — design spec Part A.1)
 // ---------------------------------------------------------------------------
 
 /// Annualized rate (dimensionless fraction per year, e.g. 0.05 = 5% APY).
@@ -48,7 +50,7 @@ impl AnnualizedRate {
 }
 
 // ---------------------------------------------------------------------------
-// Venue types (spec §C.1)
+// Venue types (design spec Part C.1)
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -87,7 +89,7 @@ impl Venue {
     /// cost model. They are intentionally higher than the real current
     /// schedules to keep the `income > cost` check conservative — a real
     /// production build would replace them with live-calibrated values
-    /// via `slippage_calibration` (see the spec).
+    /// via `slippage_calibration` (see the live-promotion checklist §5).
     #[inline]
     pub const fn taker_fee_bps(&self) -> f64 {
         match self {
@@ -113,7 +115,7 @@ impl Venue {
 
     /// Short human-readable name used in decision-log strings and
     /// dashboard-facing JSON. Uppercase first letter matches the
-    /// `Debug` impl that the dashboard's dashboard already consumes.
+    /// `Debug` impl that the dashboard already consumes.
     #[inline]
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -126,7 +128,7 @@ impl Venue {
 }
 
 // ---------------------------------------------------------------------------
-// Pair identifier (spec §C.1)
+// Pair identifier (design spec Part C.1)
 // ---------------------------------------------------------------------------
 
 /// Pair identifier: (symbol, counter venue). Pivot venue is always Pacifica.
@@ -146,7 +148,7 @@ impl PairId {
 }
 
 // ---------------------------------------------------------------------------
-// LiveInputs (spec §C.1)
+// LiveInputs (design spec Part C.1)
 // ---------------------------------------------------------------------------
 
 /// All inputs read from venues at each tick. Pure data, no state.
@@ -189,15 +191,15 @@ pub struct LiveInputs {
 }
 
 // ---------------------------------------------------------------------------
-// Mandate (spec §C.2)
+// Mandate (design spec Part C.2)
 // ---------------------------------------------------------------------------
 
-/// policy policy parameters. Immutable by construction; always passed as `&Mandate`.
+/// PM-set policy parameters. Immutable by construction; always passed as `&Mandate`.
 ///
 /// Corresponds to Python `cost_model.Mandate`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Mandate {
-    // policy mandate targets
+    // PM-set mandate targets
     pub customer_apy_min: AnnualizedRate, // 0.05
     pub customer_apy_max: AnnualizedRate, // 0.08
     pub buffer_apy_min: AnnualizedRate,   // 0.02
@@ -270,7 +272,7 @@ impl Default for Mandate {
 }
 
 // ---------------------------------------------------------------------------
-// OU process parameters (spec §C.3)
+// OU process parameters (design spec Part C.3)
 // ---------------------------------------------------------------------------
 
 /// Ornstein-Uhlenbeck process parameters for one funding-spread series.
@@ -288,7 +290,7 @@ pub struct OuParams {
     /// `theta_ou`. This is the Python `fit_ou.sigma` scaled by 8760. With
     /// this convention, `σ / √(2θ)` naturally produces `AnnualizedRate`
     /// because the `√hour` factors cancel between `σ_ou` and `√(θ_ou)`.
-    /// (the spec §C.3)
+    /// (See Rust integration design spec Part C.3.)
     pub sigma_ou: Dimensionless,
 }
 
@@ -309,7 +311,7 @@ impl OuParams {
 }
 
 // ---------------------------------------------------------------------------
-// MFG + orderbook impact parameters (spec §C.3)
+// MFG + orderbook impact parameters (design spec Part C.3)
 // ---------------------------------------------------------------------------
 
 /// Mean-field game and orderbook impact parameters (per pair or global policy).
@@ -324,7 +326,7 @@ pub struct ImpactParams {
 }
 
 // ---------------------------------------------------------------------------
-// MandateAllocation (spec §D.9)
+// MandateAllocation (design spec Part D.9)
 // ---------------------------------------------------------------------------
 
 /// Result of `cap_routing`: the three slices of vault gross APY.
@@ -339,7 +341,7 @@ pub struct MandateAllocation {
 }
 
 // ---------------------------------------------------------------------------
-// FrameworkError (spec §A.4)
+// FrameworkError (design spec Part A.4)
 // ---------------------------------------------------------------------------
 
 /// All recoverable errors from the pure math layer.

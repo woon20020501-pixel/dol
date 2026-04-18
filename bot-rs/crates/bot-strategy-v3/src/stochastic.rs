@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// NOTE: The `sigma` field here is the raw Python-scale sigma (`[series_units / √hour]`).
 /// To obtain the `OuParams.sigma_ou` (hybrid `[AnnualizedRate / √hour]`) used elsewhere in
-/// the framework, multiply by 8760 — see the spec Part C.3 
+/// the framework, multiply by 8760 — see the Rust integration design doc Part C.3.
 /// The fixture stores the raw value (pre-scaling), so parity tests compare `sigma` directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FitOuOutput {
@@ -830,7 +830,8 @@ mod tests {
     ///
     /// NOTE: This Rust reimplementation uses a simple LCG so results won't
     /// match Python's Mersenne Twister. Only used for structural sanity tests,
-    /// not for parity verification (parity tests use fixtures from the spec).
+    /// not for parity verification (parity tests use fixtures from the Python
+    /// reference implementation).
     fn generate_ou_sample(
         mu: f64,
         theta: f64,

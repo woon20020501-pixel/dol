@@ -164,8 +164,8 @@ function DepositPageInner() {
   // ceiling for Phase 1, derived from Pacifica's Closed Beta
   // per-account equity cap. The doc promised "deposits will be
   // limited and the frontend will surface a clear capacity-reached
-  // state instead of silently accepting money." Until the contracts adds
-  // a contract-level maxTotalAssets, this is that enforcement at
+  // state instead of silently accepting money." Until a contract-level
+  // maxTotalAssets is added, this is that enforcement at
   // the frontend layer: we read the Dol contract's current totalSupply
   // (which tracks USDC value at near-1:1 during Phase 1), compute
   // how much headroom is left under the cap, and gate the approve

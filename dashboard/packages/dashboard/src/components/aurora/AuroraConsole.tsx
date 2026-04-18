@@ -5,7 +5,6 @@ import {
   Area,
   AreaChart,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -18,10 +17,11 @@ import {
   type RiskLayer,
 } from "@/hooks/useAuroraTelemetry";
 import { AnimatedNumber } from "@/components/common/AnimatedNumber";
+import { MountedChart } from "@/components/charts/MountedChart";
 
 /**
  * Aurora-Ω Operate Console — the "alive" Week-1 demo layer on top of the
- * existing operator dashboard. Visualizes the bot's Rust bot telemetry:
+ * existing operator dashboard. Visualizes the Rust bot telemetry:
  *
  *   - NAV pulse curve (entry cost step-down → slow accrual climb to breakeven)
  *   - Venue health grid (Pacifica live, other 3 Week-1 fixtures)
@@ -31,9 +31,9 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
  *   - Decision log ticker (scrolling JARVIS-style)
  *   - v0 mode badge (which framework layers are intentionally stubbed)
  *
- * Data source: client-side deterministic simulator seeded from the bot's
- *  authoritative numbers. When the Rust bot's `output/nav.jsonl`
- * stream is live, swap the hook's inner source — UI stays the same.
+ * Data source: client-side deterministic simulator seeded from authoritative
+ * runtime numbers. When the Rust bot's `output/nav.jsonl` stream is live,
+ * swap the hook's inner source — UI stays the same.
  */
 export function AuroraConsole() {
   const t = useAuroraTelemetry();
@@ -265,7 +265,14 @@ function NavPulsePanel({ telemetry }: { telemetry: AuroraTelemetry }) {
       </div>
 
       <div className="mt-3 h-[150px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        {/* Render the chart only after mount completes. Recharts'
+            ResponsiveContainer initializes calculatedWidth/Height to
+            -1 until its internal ResizeObserver fires, which causes
+            a benign but console-visible "width(-1) height(-1)"
+            warning on the very first render. Deferring by one tick
+            via useMountedOnce lets the DOM lay out before the chart
+            measures, so the first render already has real dimensions. */}
+        <MountedChart height={150}>
           <AreaChart
             data={navSeries}
             margin={{ top: 4, right: 8, bottom: 4, left: 8 }}
@@ -343,7 +350,7 @@ function NavPulsePanel({ telemetry }: { telemetry: AuroraTelemetry }) {
               isAnimationActive={false}
             />
           </AreaChart>
-        </ResponsiveContainer>
+        </MountedChart>
       </div>
 
       <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-dark-tertiary">

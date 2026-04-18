@@ -14,7 +14,7 @@
  *     defining it somewhere in this file
  *   - Every long description fits in ≤ 260 characters so the tooltip
  *     card stays small enough to fly on top of the content layer
- *   - Banned-word list from  still applies: no "APY", no
+ *   - Banned-word list still applies: no "APY", no
  *     "yield", no "smart contract", no "earn"
  */
 

@@ -1,6 +1,8 @@
 # FAQ
 **Version 0.1 / Effective 2026-04-14**
 
+> **Format note:** This FAQ is structured into 7 categories with ~28 questions, designed for a tabbed UI (horizontal category tabs at the top, questions inline under each tab). Answer length target: 50–100 words each. The structure mirrors `liminal.money/faq` adapted for Dol's product surface.
+
 ---
 
 ## Category 1 — General
@@ -151,7 +153,7 @@ Please report it **privately**, not publicly. Email **security@dol.app** with as
 
 ---
 
-## Category metadata
+## Category metadata (for tab generation)
 
 ```ts
 const FAQ_CATEGORIES = [

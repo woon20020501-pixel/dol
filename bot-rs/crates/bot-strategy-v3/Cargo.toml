@@ -8,6 +8,8 @@ publish.workspace = true
 
 [dependencies]
 bot-types = { path = "../bot-types" }
-bot-math   = { path = "../bot-math" }
 thiserror  = { workspace = true }
 serde      = { workspace = true }
+
+[dev-dependencies]
+proptest = "1"

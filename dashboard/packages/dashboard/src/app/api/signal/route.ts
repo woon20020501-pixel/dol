@@ -3,14 +3,14 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
- * GET /api/signal — server-side reader for the bot's per-symbol signal JSONs.
+ * GET /api/signal — server-side reader for the Rust bot's per-symbol signal JSONs.
  *
- *  /  Option A. Reads the latest signal JSON for each
- * known symbol so the dashboard can surface live values for fields that
- * don't appear in nav.jsonl: pair_decision, cycle_lock, fair_value
- * contributing_venues, fsm mode, diagnostics.stubbed_sections, etc.
+ * Reads the latest signal JSON for each known symbol so the dashboard can
+ * surface live values for fields that don't appear in nav.jsonl:
+ * pair_decision, cycle_lock, fair_value contributing_venues, fsm mode,
+ * diagnostics.stubbed_sections, etc.
  *
- * Path layout (the bot ):
+ * Path layout:
  *   <demo_smoke>/signals/{symbol}/{yyyymmdd}/{ts_ms}.json
  *
  * One file per (symbol, tick). To grab the latest per symbol we walk the
@@ -28,7 +28,7 @@ const KNOWN_SYMBOLS = [
 
 const DEFAULT_SIGNALS_ROOT = path.resolve(
   process.cwd(),
-  "../../../bot-rs/output/demo_smoke/signals",
+  "../../../bot-rs/bot-rs/output/demo_smoke/signals",
 );
 
 function resolveSignalsRoot(): string {

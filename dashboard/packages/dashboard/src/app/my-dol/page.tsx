@@ -106,8 +106,7 @@ function MyDolInner() {
      cover the full redeem, Instant would revert with InsufficientBalance
      and MetaMask surfaces it as "exceeds max transaction gas limit".
      We grey out the Instant button before the user taps it so they get
-     a clean "use Scheduled" fallback instead of the raw gas error.
-      */
+     a clean "use Scheduled" fallback instead of the raw gas error. */
   const vaultCfg = getVaultConfig();
   const { data: vaultUsdcRaw, refetch: refetchVaultUsdc } = useReadContract({
     address: vaultCfg?.usdcAddress,

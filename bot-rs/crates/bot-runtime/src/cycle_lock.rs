@@ -35,7 +35,8 @@ use bot_strategy_v3::lock_typestate::{
 };
 use bot_types::Venue;
 
-use crate::decision::PairDecision;
+use crate::decision::{PairDecision, TypedPairDecision};
+use bot_types::sym::SymbolMarker;
 
 /// Outcome of enforcing the lock on a proposed decision.
 #[derive(Debug, Clone)]
@@ -150,6 +151,11 @@ impl CycleLockRegistry {
     ///   return the proposed decision.
     ///
     /// `now_s` is Unix seconds (f64).
+    #[tracing::instrument(
+        name = "enforce_decision",
+        skip_all,
+        fields(symbol = %symbol, now_s, emergency_override)
+    )]
     pub fn enforce_decision(
         &mut self,
         symbol: &str,
@@ -309,6 +315,37 @@ impl CycleLockRegistry {
             pair_flip_blocked,
             opened_new_cycle: raw.opened_new_cycle,
         }
+    }
+
+    /// Typestate-safe variant of [`Self::enforce_decision`].
+    ///
+    /// Takes a [`TypedPairDecision<'_, S>`] and uses `S::NAME` as the
+    /// registry key — the caller can no longer pass a mismatching
+    /// `(symbol, decision)` pair because the symbol is fixed by the
+    /// type parameter at compile time.
+    ///
+    /// `proposed = None` represents a tick with no candidate; the lock
+    /// registry still runs through `funding_cycle_lock::enforce` so a
+    /// held cycle keeps ticking forward.
+    ///
+    /// This is the I-SAME typestate wired into the production enforcement
+    /// boundary: a caller that loops over symbols must first project
+    /// the runtime `PairDecision` into a `TypedPairDecision<'_, S>` via
+    /// [`PairDecision::try_typed`], and the resulting compile-time tag
+    /// flows through to the registry.
+    #[tracing::instrument(
+        name = "enforce_decision_typed",
+        skip_all,
+        fields(symbol = S::NAME, now_s, emergency_override)
+    )]
+    pub fn enforce_decision_typed<S: SymbolMarker>(
+        &mut self,
+        now_s: f64,
+        proposed: Option<TypedPairDecision<'_, S>>,
+        emergency_override: bool,
+    ) -> EnforceOutcome {
+        let pd_ref = proposed.map(|t| t.pair_decision());
+        self.enforce_decision(S::NAME, now_s, pd_ref, emergency_override)
     }
 }
 
@@ -485,5 +522,87 @@ mod tests {
             "override must move typed phase to EmergencyOverride"
         );
         assert!(!reg.is_typed_locked("BTC"));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // enforce_decision_typed — I-SAME typestate wiring tests
+    // ─────────────────────────────────────────────────────────────────────
+
+    use bot_types::sym::{BtcMarker, EthMarker};
+
+    /// The typed enforce path uses `S::NAME` as the registry key, not a
+    /// caller-provided string. A BTC-typed decision landing in the registry
+    /// must appear under the "BTC" key.
+    #[test]
+    fn enforce_decision_typed_uses_marker_name_as_key() {
+        let mut reg = CycleLockRegistry::new();
+        let d = make_decision(Venue::Pacifica, Venue::Backpack, 100.0);
+        let typed = d
+            .try_typed::<BtcMarker>()
+            .expect("BTC marker accepts BTC symbol");
+        let out = reg.enforce_decision_typed::<BtcMarker>(1_700_000_000.0, Some(typed), false);
+        assert!(out.opened_new_cycle);
+        // The untyped lookup must find the lock under "BTC".
+        assert!(reg.is_typed_locked("BTC"));
+        assert!(reg.locked_decision_for("BTC").is_some());
+    }
+
+    /// `try_typed::<EthMarker>()` on a BTC decision returns None; the
+    /// typed enforce path therefore sees `proposed = None` and the
+    /// registry does NOT silently store the BTC decision under the "ETH"
+    /// key. This is the core I-SAME guard: a caller cannot project a
+    /// decision into the wrong marker's slot.
+    #[test]
+    fn try_typed_with_wrong_marker_cannot_leak_into_other_slot() {
+        let mut reg = CycleLockRegistry::new();
+        let btc = make_decision(Venue::Pacifica, Venue::Backpack, 100.0);
+        assert!(
+            btc.try_typed::<EthMarker>().is_none(),
+            "BTC decision must not project to ETH marker"
+        );
+        let eth_typed = btc.try_typed::<EthMarker>();
+        let _out = reg.enforce_decision_typed::<EthMarker>(1_700_000_000.0, eth_typed, false);
+        // Regardless of what funding_cycle_lock does with h=0/n=0 (an
+        // internal Python-parity detail), the ETH registry slot must not
+        // hold a decision — the BTC decision cannot leak in.
+        assert!(
+            reg.locked_decision_for("ETH").is_none(),
+            "ETH slot must remain empty when only a BTC decision existed"
+        );
+        assert!(
+            !reg.is_typed_locked("ETH"),
+            "ETH slot phase must not be Locked"
+        );
+    }
+
+    /// Two different markers give independent registry slots. A BTC lock
+    /// and an ETH lock can coexist without interference — the compile-time
+    /// marker enforces that you cannot query one slot while holding a
+    /// handle to the other.
+    #[test]
+    fn independent_marker_slots_do_not_interfere() {
+        let mut reg = CycleLockRegistry::new();
+        let btc_pd = make_decision(Venue::Pacifica, Venue::Backpack, 100.0);
+        let typed_btc = btc_pd.try_typed::<BtcMarker>().unwrap();
+        reg.enforce_decision_typed::<BtcMarker>(1_700_000_000.0, Some(typed_btc), false);
+        // ETH slot still empty
+        assert!(reg.is_typed_locked("BTC"));
+        assert!(!reg.is_typed_locked("ETH"));
+        // Open ETH
+        let eth_pd = PairDecision {
+            long_venue: Venue::Pacifica,
+            short_venue: Venue::Backpack,
+            symbol: "ETH".to_string(),
+            spread_annual: 0.02,
+            cost_fraction: 0.001,
+            net_annual: 0.019,
+            notional_usd: 200.0,
+            reason: String::new(),
+            would_have_executed: true,
+        };
+        let typed_eth = eth_pd.try_typed::<EthMarker>().unwrap();
+        reg.enforce_decision_typed::<EthMarker>(1_700_000_000.0, Some(typed_eth), false);
+        assert!(reg.is_typed_locked("ETH"));
+        assert!(reg.is_typed_locked("BTC"), "BTC lock must not be affected");
     }
 }

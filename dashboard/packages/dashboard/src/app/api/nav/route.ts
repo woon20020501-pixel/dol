@@ -3,12 +3,12 @@ import { promises as fs } from "fs";
 import path from "path";
 
 /**
- * GET /api/nav — server-side reader for the bot's `nav.jsonl`.
+ * GET /api/nav — server-side reader for the Rust bot's `nav.jsonl`.
  *
- * See the spec  for the full spec. Summary:
+ * Summary:
  *
  *   - Resolves file path from NAV_JSONL_PATH env var or the default
- *     `bot-rs/output/demo_smoke/nav.jsonl` under the monorepo root
+ *     `bot-rs/bot-rs/output/demo_smoke/nav.jsonl` under the repo root
  *   - Reads the file, splits on newlines, parses each line as JSON,
  *     silently skipping parse errors (handles mid-write partials)
  *   - Supports ?since_ms=<number> to stream only new rows, and
@@ -25,13 +25,12 @@ export const dynamic = "force-dynamic";
 
 const STALE_THRESHOLD_MS = 30_000;
 
-// Resolve the default relative to the Next.js cwd. In the monorepo
-// layout the dashboard cwd is `dol-public/dashboard/packages/dashboard`,
-// so walking up 3 levels lands at the repo root (`dol-public/`) and the
-// relative path then reaches the bot output.
+// Resolve the default relative to the Next.js cwd. For local dev the
+// dashboard cwd is `dashboard/packages/dashboard`, so walking up 3 levels
+// lands in the repo root and the relative path then reaches the bot output.
 const DEFAULT_NAV_PATH = path.resolve(
   process.cwd(),
-  "../../../bot-rs/output/demo_smoke/nav.jsonl",
+  "../../../bot-rs/bot-rs/output/demo_smoke/nav.jsonl",
 );
 
 // Production fallback: a 2000-line snapshot of real bot output

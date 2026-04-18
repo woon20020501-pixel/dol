@@ -21,8 +21,8 @@ import { Search } from "lucide-react";
  * The filter is a straightforward substring search across command
  * labels; rank ties are broken by insertion order.
  *
- * This is the "optional tier" from  Phase 2.5, shipped as part
- * of the  consolidated trim commit.
+ * This is an optional tier from Phase 2.5, shipped as part
+ * of a consolidated trim commit.
  */
 
 type Command = {

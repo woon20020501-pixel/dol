@@ -139,7 +139,7 @@ pub async fn run(args: DemoArgs) -> Result<()> {
             }
             Err(e) => {
                 anyhow::bail!(
-                    "--pacifica-auth requires PACIFICA_API_KEY and PACIFICA_BUILDER_CODE.                      Error: {e}."
+                    "--pacifica-auth requires PACIFICA_API_KEY and PACIFICA_BUILDER_CODE. Error: {e}."
                 );
             }
         }
@@ -347,8 +347,7 @@ pub async fn run(args: DemoArgs) -> Result<()> {
 
     // Compute per-symbol cumulative accruals for top/bottom ranking.
     // Bps is **NAV-level** (portfolio-wide denominator) so it sums across
-    // symbols to the aggregate bps, matching the dashboard's dashboard labels.
-    // Matches  convention.
+    // symbols to the aggregate bps, matching the dashboard labels.
     let mut symbol_accruals: Vec<(String, f64, f64)> = symbols
         .iter()
         .map(|sym| {

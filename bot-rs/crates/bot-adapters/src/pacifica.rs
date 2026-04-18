@@ -25,12 +25,12 @@ const FUNDING_INTERVAL_HOURS: f64 = 1.0;
 const FUNDING_INTERVAL_SECONDS: i64 = (FUNDING_INTERVAL_HOURS * 3600.0) as i64;
 
 /// Fallback tick size used when the venue metadata endpoint is unavailable.
-/// NOTE: query from Pacifica instrument metadata endpoint when available.
+/// TODO: query from Pacifica instrument metadata endpoint when available.
 const FALLBACK_TICK_SIZE: f64 = 0.01;
 
 /// Synthetic depth-curve offsets in basis points (for fractal_delta OLS).
 /// Used when the REST orderbook only returns top-of-book.
-/// NOTE: replace with a multi-level orderbook fetch once Pacifica exposes it.
+/// TODO: replace with a multi-level orderbook fetch once Pacifica exposes it.
 const SYNTHETIC_DEPTH_OFFSETS_BPS: [f64; 5] = [1.0, 2.0, 5.0, 10.0, 20.0];
 
 /// Demo symbol list returned by `list_symbols` when the venue API doesn't
@@ -43,7 +43,7 @@ const SYNTHETIC_DEPTH_OFFSETS_BPS: [f64; 5] = [1.0, 2.0, 5.0, 10.0, 20.0];
 ///   with coin identifiers `xyz:GOLD` / `xyz:SILVER`.
 /// - PAXG has a native HL perp (regular coin id).
 ///
-/// NOTE: replace with a real Pacifica instruments endpoint.
+/// TODO: replace with a real Pacifica instruments endpoint.
 const DEMO_SYMBOLS: &[&str] = &[
     "BTC", "ETH", "SOL", "BNB", "ARB", "AVAX", "SUI", "XAU", "XAG", "PAXG",
 ];
@@ -130,7 +130,7 @@ impl VenueAdapter for PacificaReadOnlyAdapter {
         let depth_top_usd = bid_depth_usd + ask_depth_usd;
 
         // Synthetic depth curve — Pacifica REST /book only returns top-of-book.
-        // NOTE: fetch multi-level orderbook when Pacifica exposes it, and fit the
+        // TODO: fetch multi-level orderbook when Pacifica exposes it, and fit the
         //       real cumulative depth at each offset for fractal_delta OLS.
         let depth_curve: Vec<(f64, f64)> = SYNTHETIC_DEPTH_OFFSETS_BPS
             .iter()
@@ -159,13 +159,13 @@ impl VenueAdapter for PacificaReadOnlyAdapter {
         let open_interest_usd = Usd(funding_res.open_interest_usd);
 
         // ── Mark bias ─────────────────────────────────────────────────────
-        // NOTE: compute (mark - mid) / mid * 1e4 once PacificaRest exposes
+        // TODO: compute (mark - mid) / mid * 1e4 once PacificaRest exposes
         //       the mark price separately from mid. Currently mark == mid on
         //       the normalized FundingRate; bias would always be 0.
         let mark_bias_bps = 0.0;
 
         // ── Tick size ─────────────────────────────────────────────────────
-        // NOTE: query from Pacifica instruments/metadata endpoint when available.
+        // TODO: query from Pacifica instruments/metadata endpoint when available.
         let tick_size = FALLBACK_TICK_SIZE;
 
         Ok(VenueSnapshot {
@@ -189,7 +189,7 @@ impl VenueAdapter for PacificaReadOnlyAdapter {
     }
 
     async fn list_symbols(&self) -> Result<Vec<String>, AdapterError> {
-        // NOTE: replace with a real Pacifica instruments/markets endpoint when available.
+        // TODO: replace with a real Pacifica instruments/markets endpoint when available.
         warn!(
             venue = "pacifica",
             "list_symbols: using hardcoded demo list; \

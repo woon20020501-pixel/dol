@@ -1,12 +1,11 @@
-//! Per-symbol adapter health telemetry —  response.
+//! Per-symbol adapter health telemetry.
 //!
 //! Tracks the "drops-and-continues" failure behavior of the tick engine so
-//! the dashboard's dashboard can render a yellow/red warning glyph on symbols
-//! whose Pacifica `/book` endpoint has been flaky. Does NOT implement the
-//! retry-and-degrade policy from ;  the current
-//! `run_one_tick` already drops the failing venue and proceeds with the
-//! others, so demo safety is preserved. This module only adds the
-//! counter rollup the spec requested.
+//! the dashboard can render a yellow/red warning glyph on symbols
+//! whose Pacifica `/book` endpoint has been flaky. Does NOT implement a
+//! retry-and-degrade policy; `run_one_tick` already drops the failing
+//! venue and proceeds with the others, so demo safety is preserved.
+//! This module only adds the counter rollup for telemetry.
 //!
 //! If the policy ever needs to escalate to (b) — the full retry-and-
 //! degrade path — extend `SymbolHealth` with `cooldown_remaining`
@@ -29,10 +28,10 @@ pub struct SymbolHealth {
     /// Consecutive ticks ending in at least one venue-fetch failure.
     /// Resets to 0 on a tick where every venue fetch succeeded.
     pub consecutive_failures: u32,
-    /// True iff `consecutive_failures >= DEGRADATION_THRESHOLD`. the dashboard's
+    /// True iff `consecutive_failures >= DEGRADATION_THRESHOLD`. The
     /// dashboard renders a red dot when this is true. Note: demo mode does
     /// NOT exclude the symbol from the decision loop when degraded — that
-    /// is the (b) policy in  which we have not implemented.
+    /// is the full retry-and-degrade policy which has not been implemented.
     /// The flag is advisory telemetry only in v0.
     pub is_degraded: bool,
     /// Last venue that failed to fetch for this symbol, as a readable
@@ -42,7 +41,6 @@ pub struct SymbolHealth {
 }
 
 /// Consecutive-failure threshold that flips `is_degraded = true`.
-/// Matches  step 5.
 pub const DEGRADATION_THRESHOLD: u32 = 3;
 
 /// Registry of per-symbol adapter health, keyed by symbol string.

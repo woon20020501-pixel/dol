@@ -813,29 +813,9 @@ fn lifecycle() {
 }
 
 // ===========================================================================
-// Phase 2 sections — all marked #[ignore]
+// Phase 2 functions now covered in `parity_stochastic.rs`:
+//   - fit_ou   → `parity_fit_ou`
+//   - adf      → `parity_adf`
+//   - cvar     → `parity_cvar_drawdown_stop`
+//   - expected_residual_income → wired in `scoring.rs` runtime path
 // ===========================================================================
-
-#[test]
-#[ignore = "Phase 2 gated: fit_ou not implemented yet"]
-fn fit_ou() {}
-
-#[test]
-#[ignore = "Phase 2 gated: adf not implemented yet"]
-fn adf() {}
-
-#[test]
-#[ignore = "Phase 2 gated: cvar not implemented yet"]
-fn cvar() {}
-
-#[test]
-#[ignore = "Phase 2 gated: hurst not implemented yet"]
-fn hurst() {}
-
-#[test]
-#[ignore = "Phase 2 gated: expected_residual_income not implemented yet"]
-fn expected_residual_income() {}
-
-#[test]
-#[ignore = "Phase 2 gated: dry_run_end_to_end conservative default — not a real fixture"]
-fn dry_run_end_to_end() {}

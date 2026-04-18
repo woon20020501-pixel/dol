@@ -8,7 +8,6 @@ publish.workspace = true
 
 [dependencies]
 bot-types = { path = "../bot-types" }
-serde = { workspace = true }
 
 [dev-dependencies]
 hashbrown = { workspace = true }

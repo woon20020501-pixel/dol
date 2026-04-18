@@ -32,7 +32,7 @@ pub fn cap_routing(vault_gross: AnnualizedRate, mandate: &Mandate) -> MandateAll
 
     let res = res_raw + excess_2;
 
-    // Conservation invariant (spec §I.1)
+    // Conservation invariant (capital-conservation I.1)
     debug_assert!(
         ((cust + buf + res) - vault_gross.0).abs() < 1e-12,
         "cap_routing conservation violated: cust={cust} buf={buf} res={res} sum={} gross={}",

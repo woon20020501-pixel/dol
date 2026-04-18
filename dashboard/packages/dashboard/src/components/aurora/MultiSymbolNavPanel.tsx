@@ -5,7 +5,6 @@ import {
   Line,
   LineChart,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -18,10 +17,10 @@ import {
   type SymbolState,
 } from "@/hooks/useAuroraTelemetry";
 import { AnimatedNumber } from "@/components/common/AnimatedNumber";
+import { MountedChart } from "@/components/charts/MountedChart";
 
 /**
- * Multi-symbol NAV panel — the high-dimensional viz called for in the spec
- * . Layers:
+ * Multi-symbol NAV panel — the high-dimensional viz. Layers:
  *
  *   1. Hierarchical line chart
  *      - 1 THICK aggregate line (10-pair portfolio NAV vs $10k seed)
@@ -32,7 +31,7 @@ import { AnimatedNumber } from "@/components/common/AnimatedNumber";
  *   2. Sparkline strip — 10 tiles showing each symbol's NAV trajectory
  *      and live gain, sorted by current rank
  *   3. "10 → 46 pairs" production-bridge caption with canonical talking
- *      points from 
+ *      points
  */
 export function MultiSymbolNavPanel() {
   const t = useAuroraTelemetry();
@@ -192,7 +191,10 @@ function MultiLineChart({ telemetry }: { telemetry: AuroraTelemetry }) {
   return (
     <div className="mt-4">
       <div className="h-[280px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+        {/* Deferred render after mount — see AuroraConsole for the
+            same pattern. Avoids recharts' "width(-1) height(-1)"
+            warning on first render while the container measures. */}
+        <MountedChart height={280}>
           <LineChart
             data={bpsData}
             margin={{ top: 14, right: 16, bottom: 14, left: 8 }}
@@ -318,7 +320,7 @@ function MultiLineChart({ telemetry }: { telemetry: AuroraTelemetry }) {
               isAnimationActive={false}
             />
           </LineChart>
-        </ResponsiveContainer>
+        </MountedChart>
       </div>
 
       {/* Legend */}
@@ -437,7 +439,7 @@ function SparklineTile({ s }: { s: SymbolState }) {
               className="font-mono text-[10px] leading-none text-dark-tertiary"
               title={
                 s.kind === "rwa"
-                  ? `Reduced venue coverage: Pacifica + Hyperliquid only. Lighter and Backpack don't list ${s.symbol} (gold/silver commodities). The bot routes ${s.symbol} through the 2-venue pair Expected operational state, not a fault.`
+                  ? `Reduced venue coverage: Pacifica + Hyperliquid only. Lighter and Backpack don't list ${s.symbol} (gold/silver commodities). The bot routes ${s.symbol} through the 2-venue pair. Expected operational state, not a fault.`
                   : `Fetch failures detected — investigate adapter logs for ${s.symbol}.`
               }
               aria-label={
@@ -543,7 +545,7 @@ function BridgeCaption() {
         independent oracles on each leg, documented structural risk sized by
         venue concentration caps. Production scales to 46 pairs at 50%
         deployment — mandate ceiling 8.00% customer / 4.78% buffer / 1.42%
-        reserve under research's 60-day backtest.
+        reserve under the 60-day backtest.
       </p>
     </div>
   );

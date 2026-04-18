@@ -1,6 +1,6 @@
 //! Live WebSocket integration tests — connect to real mainnet endpoints.
 //!
-//! Marked `#[ignore]` so they don't run in CI. Run manually:
+//! Marked `#[ignore = "Requires live Pacifica WebSocket at wss://ws.pacifica.fi/ws. Run: cargo test -p bot-venues --test live_ws -- --ignored. Network + 30s runtime."]` so they don't run in CI. Run manually:
 //!   cargo test -p bot-venues --test live_ws -- --ignored
 
 use std::sync::Arc;
@@ -15,7 +15,7 @@ use bot_venues::net::CircuitBreaker;
 // ── Pacifica live test ─────────────────────────────────────────
 
 #[tokio::test]
-#[ignore]
+#[ignore = "Requires live Pacifica WebSocket at wss://ws.pacifica.fi/ws. Run: cargo test -p bot-venues --test live_ws -- --ignored. Network + 30s runtime."]
 async fn pacifica_ws_live_funding() {
     use bot_venues::pacifica::ws::{run_ws_loop, WsCache};
 
@@ -103,7 +103,7 @@ async fn pacifica_ws_live_funding() {
 // ── Lighter live test ──────────────────────────────────────────
 
 #[tokio::test]
-#[ignore]
+#[ignore = "Requires live Pacifica WebSocket at wss://ws.pacifica.fi/ws. Run: cargo test -p bot-venues --test live_ws -- --ignored. Network + 30s runtime."]
 async fn lighter_ws_live_ticker() {
     use bot_venues::lighter::rest::LighterRest;
     use bot_venues::lighter::ws::{run_ws_loop, WsCache};

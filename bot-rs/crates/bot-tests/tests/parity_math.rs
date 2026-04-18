@@ -28,8 +28,6 @@ fn fixtures_dir() -> PathBuf {
     if let Ok(p) = std::env::var("DOL_MATH_PARITY_DIR") {
         return PathBuf::from(p);
     }
-    // CARGO_MANIFEST_DIR → crates/bot-tests; ../ → crates; ../../ → bot-rs;
-    // ../../../ → dol-public (monorepo root). Then strategy/rust_fixtures.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

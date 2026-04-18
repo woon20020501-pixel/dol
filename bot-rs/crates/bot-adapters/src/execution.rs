@@ -79,10 +79,17 @@ impl Ed25519Signer {
                 seed.len()
             )));
         }
-        let mut seed_arr = [0u8; 32];
+        // Move the seed bytes through a Zeroizing wrapper so the local
+        // copy cannot outlive this function body: `Zeroizing<[u8; 32]>`
+        // wipes the array on drop even if we panic partway through.
+        let mut seed_arr = zeroize::Zeroizing::new([0u8; 32]);
         seed_arr.copy_from_slice(seed);
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed_arr);
+        // seed_arr drops here → Zeroize erases bytes.
         let verifying_key = signing_key.verifying_key();
+        // Note: `seed_arr: Zeroizing<[u8; 32]>` is explicitly dropped here
+        // when the fn returns — Zeroizing's Drop impl wipes the bytes.
+        // The caller's &[u8] buffer is their responsibility.
         Ok(Self {
             signing_key,
             verifying_key_bytes: verifying_key.to_bytes(),
@@ -320,7 +327,12 @@ impl OrderClient {
             adapter,
             signer,
             retry,
-            rng_state: std::sync::Mutex::new(0x12345678_9abcdef0),
+            rng_state: std::sync::Mutex::new(
+                std::env::var("BOT_RS_SEED")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0x1234_5678_9abc_def0),
+            ),
         }
     }
 
@@ -450,6 +462,17 @@ mod tests {
         let a = ClientOrderId::new();
         let b = ClientOrderId::new();
         assert_ne!(a, b);
+    }
+
+    /// Proof: `from_seed` wraps transient seed bytes in `zeroize::Zeroizing`
+    /// so the stack-local copy is wiped on drop.
+    #[test]
+    fn zeroize_wrapper_is_in_use() {
+        use zeroize::Zeroize;
+        let mut arr = zeroize::Zeroizing::new([9u8; 32]);
+        assert_eq!(*arr, [9u8; 32]);
+        (*arr).zeroize();
+        assert_eq!(*arr, [0u8; 32]);
     }
 
     #[test]

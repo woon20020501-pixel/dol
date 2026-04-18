@@ -27,8 +27,7 @@
 //! rates jitter on ~1 pp timescales. A relative-hysteresis gate becomes
 //! ineffective when the held pair's current spread degrades — the
 //! threshold shrinks with it and churn restarts. The explicit
-//! no-rebalance policy is documented in the spec T3-29 as
-//! a pre-Tier-1-live cleanup item; production will use
+//! no-rebalance policy is a pre-Tier-1-live cleanup item; production will use
 //! `funding_cycle_lock` + `forecast_scoring` + `fsm_controller` +
 //! `cvar_guard` to drive rebalance decisions on meaningful signals.
 //!
@@ -40,8 +39,11 @@
 //! - `would_have_executed` is always `true` in demo mode; every decision
 //!   is telemetry-only. No adapter is called to submit.
 
+use core::marker::PhantomData;
+
 use bot_adapters::venue::VenueSnapshot;
 use bot_math::cost::slippage;
+use bot_types::sym::SymbolMarker;
 use bot_types::{Usd, Venue};
 use tracing::info;
 
@@ -74,6 +76,87 @@ pub struct PairDecision {
     pub would_have_executed: bool,
 }
 
+/// Compile-time-tagged view of a [`PairDecision`] whose runtime `symbol`
+/// field has been checked to equal the marker's `NAME` constant.
+///
+/// This is the typestate witness for I-SAME at the function-signature
+/// level: a function taking `&TypedPairDecision<'_, BtcMarker>` cannot be
+/// called with a decision whose symbol is `"ETH"` (runtime check on
+/// construction) *and* cannot be called with a
+/// `&TypedPairDecision<'_, EthMarker>` even if the underlying decision
+/// happens to be BTC (compile error — different type parameters).
+///
+/// # Type-mismatch is a compile error
+///
+/// ```compile_fail
+/// use bot_runtime::decision::{PairDecision, TypedPairDecision};
+/// use bot_types::sym::{BtcMarker, EthMarker};
+/// fn requires_btc(_: &TypedPairDecision<'_, BtcMarker>) {}
+/// let pd = PairDecision {
+///     long_venue: bot_types::Venue::Pacifica,
+///     short_venue: bot_types::Venue::Lighter,
+///     symbol: "ETH".to_string(),
+///     spread_annual: 0.0, cost_fraction: 0.0, net_annual: 0.0,
+///     notional_usd: 0.0, reason: String::new(), would_have_executed: false,
+/// };
+/// let eth = pd.try_typed::<EthMarker>().unwrap();
+/// requires_btc(&eth); // ERROR: EthMarker != BtcMarker
+/// ```
+#[derive(Debug, Clone, Copy)]
+pub struct TypedPairDecision<'a, S: SymbolMarker> {
+    pd: &'a PairDecision,
+    _marker: PhantomData<S>,
+}
+
+impl<'a, S: SymbolMarker> TypedPairDecision<'a, S> {
+    /// Borrow the wrapped [`PairDecision`].
+    #[inline]
+    #[must_use]
+    pub fn pair_decision(&self) -> &'a PairDecision {
+        self.pd
+    }
+
+    /// Statically-known symbol string — equals `S::NAME`.
+    #[inline]
+    #[must_use]
+    pub fn symbol(&self) -> &'static str {
+        S::NAME
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn long_venue(&self) -> Venue {
+        self.pd.long_venue
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn short_venue(&self) -> Venue {
+        self.pd.short_venue
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn notional_usd(&self) -> f64 {
+        self.pd.notional_usd
+    }
+}
+
+impl PairDecision {
+    /// Attempt to attach a compile-time symbol marker. Returns `None` if
+    /// the runtime `symbol` disagrees with `S::NAME`. Once `Some(_)` is
+    /// returned, every downstream function taking `TypedPairDecision<_, S>`
+    /// is compile-time symbol-safe.
+    #[inline]
+    #[must_use]
+    pub fn try_typed<S: SymbolMarker>(&self) -> Option<TypedPairDecision<'_, S>> {
+        (self.symbol == S::NAME).then_some(TypedPairDecision {
+            pd: self,
+            _marker: PhantomData,
+        })
+    }
+}
+
 /// Per-pair notional as a fraction of current NAV (1 % per PRINCIPLES.md §5.1).
 const NOTIONAL_FRACTION_OF_NAV: f64 = 0.01;
 
@@ -92,6 +175,11 @@ const NOTIONAL_FRACTION_OF_NAV: f64 = 0.01;
 /// - Inner enumeration touches only stack values.
 /// - No collection resizing, no `clone`, no `format!` until the winner is
 ///   chosen.
+#[tracing::instrument(
+    name = "decide",
+    skip_all,
+    fields(num_snapshots = snapshots.len(), nav_usd, min_spread_annual)
+)]
 pub fn decide(
     snapshots: &[VenueSnapshot],
     nav_usd: f64,
@@ -419,5 +507,76 @@ mod tests {
         assert_eq!(d1.cost_fraction, d2.cost_fraction);
         assert_eq!(d1.spread_annual, d2.spread_annual);
         assert_eq!(d1.net_annual, d2.net_annual);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // TypedPairDecision — typestate wiring tests
+    // ─────────────────────────────────────────────────────────────────────
+    //
+    // These tests prove:
+    //   (1) `try_typed::<S>()` returns `Some` iff the runtime symbol matches
+    //       the marker's `NAME`.
+    //   (2) Accessors on the typed wrapper return the wrapped decision's
+    //       values faithfully.
+    //   (3) The `symbol()` accessor returns `S::NAME` (a &'static str),
+    //       proving it's type-derived, not read from the runtime field.
+    //
+    // The compile_fail doctest on `TypedPairDecision` proves the negative
+    // half (cross-marker types are rejected).
+
+    use bot_types::sym::{BtcMarker, EthMarker, SymbolMarker};
+
+    fn btc_pd() -> PairDecision {
+        PairDecision {
+            long_venue: Venue::Lighter,
+            short_venue: Venue::Backpack,
+            symbol: "BTC".to_string(),
+            spread_annual: 0.03,
+            cost_fraction: 0.0015,
+            net_annual: 0.0285,
+            notional_usd: 1_000.0,
+            reason: "btc test".to_string(),
+            would_have_executed: true,
+        }
+    }
+
+    #[test]
+    fn try_typed_some_when_symbol_matches_marker() {
+        let pd = btc_pd();
+        let typed = pd.try_typed::<BtcMarker>();
+        assert!(typed.is_some(), "BTC decision + BtcMarker should be Some");
+    }
+
+    #[test]
+    fn try_typed_none_when_symbol_mismatches_marker() {
+        let pd = btc_pd();
+        let mistyped = pd.try_typed::<EthMarker>();
+        assert!(
+            mistyped.is_none(),
+            "BTC decision + EthMarker must be None (cross-symbol guard)"
+        );
+    }
+
+    #[test]
+    fn typed_accessors_reflect_wrapped_decision() {
+        let pd = btc_pd();
+        let typed = pd.try_typed::<BtcMarker>().unwrap();
+        assert_eq!(typed.symbol(), BtcMarker::NAME);
+        assert_eq!(typed.symbol(), "BTC");
+        assert_eq!(typed.long_venue(), Venue::Lighter);
+        assert_eq!(typed.short_venue(), Venue::Backpack);
+        assert_eq!(typed.notional_usd(), 1_000.0);
+        // pair_decision() returns the underlying &PairDecision
+        assert_eq!(typed.pair_decision().symbol, "BTC");
+    }
+
+    #[test]
+    fn typed_symbol_is_static_str_from_marker() {
+        // Prove the symbol() accessor returns a 'static str — i.e. it's
+        // sourced from the marker's NAME constant, not the runtime field.
+        let pd = btc_pd();
+        let typed = pd.try_typed::<BtcMarker>().unwrap();
+        let s: &'static str = typed.symbol();
+        assert_eq!(s, "BTC");
     }
 }

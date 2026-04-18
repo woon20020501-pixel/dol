@@ -153,4 +153,4 @@ The cost of doing it this way is that the team is small, the testnet phase is lo
 
 ---
 
-*This page is a high-level overview written for external readers. The implementation handoff documents in the strategy repo are the source of truth and may be more current. Last updated 2026-04-15.*
+*This page is a high-level overview written for external readers. The implementation design documents in the strategy repo are the source of truth and may be more current. Last updated 2026-04-15.*
